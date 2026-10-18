@@ -1,0 +1,13 @@
+[submodule "vendor/sld3"]
+	path = vendor/sdl3
+	url = https://github.com/libsdl-org/SDL.git
+[submodule "vendor/imgui"]
+	path = vendor/imgui
+	url = https://github.com/ocornut/imgui.git
+	branch = docking
+[submodule "vendor/vkb"]
+	path = vendor/vkb
+	url = https://github.com/charles-lunarg/vk-bootstrap.git
+[submodule "vendor/vma"]
+	path = vendor/vma
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git

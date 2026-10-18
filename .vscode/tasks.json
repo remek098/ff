@@ -1,0 +1,74 @@
+// {
+//     "version": "2.0.0",
+//     "tasks": [
+//         {
+//             "type": "shell",
+//             "label": "CMake: build",
+//             // Zwróć uwagę na zmianę nazwy pliku na build-${input:buildType}.ps1
+//             "command": "powershell -ExecutionPolicy Bypass -File \"${workspaceFolder}/build-${input:buildType}.ps1\"",
+//             "group": {
+//                 "kind": "build",
+//                 "isDefault": true
+//             },
+//             "problemMatcher": [
+//                 "$gcc"
+//             ]
+//         },
+//         {
+//             "type": "shell",
+//             "label": "CMake: Clean & Reconfigure",
+//             "command": "cmake --build \"${workspaceFolder}/build-${input:buildType}\" --target clean",
+//             "group": "none",
+//             "problemMatcher": []
+//         }
+//     ],
+//     "inputs": [
+//         {
+//             "id": "buildType",
+//             "type": "pickString",
+//             "description": "Wybierz konfigurację:",
+//             "options": [
+//                 "Debug",
+//                 "Release"
+//             ],
+//             "default": "Debug"
+//         }
+//     ]
+// }
+
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "CMake: build",
+            // Domyślna komenda (Linux/macOS)
+            "command": "chmod +x build-${input:buildType}.sh && ./build-${input:buildType}.sh",
+            "windows": {
+                // Nadpisanie dedykowane dla systemu Windows
+                "command": "powershell -ExecutionPolicy Bypass -File \"${workspaceFolder}/build-${input:buildType}.ps1\""
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "type": "shell",
+            "label": "CMake: Clean & Reconfigure",
+            "command": "cmake --build \"${workspaceFolder}/build-${input:buildType}\" --target clean",
+            "group": "none",
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "buildType",
+            "type": "pickString",
+            "description": "Wybierz konfigurację:",
+            "options": ["Debug", "Release"],
+            "default": "Debug"
+        }
+    ]
+}

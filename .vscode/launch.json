@@ -1,0 +1,31 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch (Cross-Platform)",
+            // Domyślny debuger dla Linux / macOS (wymaga CodeLLDB lub wbudowanego lldb)
+            "type": "lldb", 
+            "request": "launch",
+            "program": "${workspaceFolder}/build-${input:buildType}/bin/main", // brak .exe na Unixach
+            "cwd": "${workspaceFolder}/build-${input:buildType}/bin",
+            
+            // --- NACPISANIE DLA WINDOWS ---
+            "windows": {
+                "type": "cppvsdbg",
+                "program": "${workspaceFolder}\\build-${input:buildType}\\bin\\main.exe",
+                "cwd": "${workspaceFolder}\\build-${input:buildType}\\bin"
+            },
+            
+            "preLaunchTask": "CMake: build"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "buildType",
+            "type": "pickString",
+            "description": "Wybierz konfigurację:",
+            "options": ["Debug", "Release"],
+            "default": "Debug"
+        }
+    ]
+}
