@@ -3,6 +3,18 @@ file(GLOB_RECURSE ENGINE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
 )
 
+set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/vendor/imgui")
+
+list(APPEND ENGINE_SOURCES
+    "${IMGUI_DIR}/imgui.cpp"
+    "${IMGUI_DIR}/imgui_demo.cpp"
+    "${IMGUI_DIR}/imgui_draw.cpp"
+    "${IMGUI_DIR}/imgui_tables.cpp"
+    "${IMGUI_DIR}/imgui_widgets.cpp"
+    "${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp"
+    "${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp"
+)
+
 # Tworzymy bibliotekę statyczną o nazwie 'engine'
 add_library(engine STATIC ${ENGINE_SOURCES})
 
@@ -13,6 +25,8 @@ target_include_directories(engine PUBLIC
     "${CMAKE_SOURCE_DIR}/vendor/vma/include"    # Vulkan Memory Allocator
     "${CMAKE_SOURCE_DIR}/vendor/sdl3/include"   # SDL3
     "${CMAKE_SOURCE_DIR}/vendor/vkb/src"        # VkBootstrap
+    "${IMGUI_DIR}"                              # ImGui
+    "${IMGUI_DIR}/backends"                     # ImGui backends
 )
 
 

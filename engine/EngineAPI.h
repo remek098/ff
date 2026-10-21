@@ -8,4 +8,6 @@
 #include "../vendor/imgui/imgui.h"
 #include "SDL3/SDL.h"
 #include "SDL3/SDL_vulkan.h"
+#include "imgui_impl_vulkan.h"
+#include "imgui_impl_sdl3.h"
 // #include "../vendor/sdl3/include/SDL3/SDL_main.h"
