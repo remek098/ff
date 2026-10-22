@@ -18,7 +18,7 @@ using i64	= int64_t;
 using f32 = float;
 using f64 = double;
 
-constexpr u8	u8_invalid_id{ 0xffui8 }; // -1
-constexpr u16	u16_invalid_id{ 0xffffui16 }; // -1
-constexpr u32	u32_invalid_id{ 0xffff'ffffui32 }; // -1
-constexpr u64	u64_invalid_id{ 0xffff'ffff'ffff'ffffui64 }; // -1
+constexpr u8    u8_invalid_id{ static_cast<u8>(0xff) }; 
+constexpr u16   u16_invalid_id{ static_cast<u16>(0xffff) }; 
+constexpr u32   u32_invalid_id{ 0xffff'ffffU };
+constexpr u64   u64_invalid_id{ 0xffff'ffff'ffff'ffffULL };

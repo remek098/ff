@@ -66,3 +66,7 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+#macOS bullcrap
+.DS_Store
+**/ .DS_Store

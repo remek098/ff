@@ -12,11 +12,12 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    const char* name = "";
-#if defined(_DEBUG)
-    name = "ff window debug";
-#elif defined(NDEBUG)
+    const char* name = "ff window default";
+
+#if defined(NDEBUG)
     name = "ff window release";
+#else
+    name = "ff window debug"; // Fallback for Debug (when NDEBUG is not defined)
 #endif
     // 2. NAJPIERW TWORZYMY OKNO - System zarezerwuje pamięć okna pod kontekst Vulkan
     SDL_Window* window = SDL_CreateWindow(

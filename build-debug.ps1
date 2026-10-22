@@ -1,8 +1,7 @@
-Write-Host "=== URUCHAMIANIE SKRYPTU: BUDOWANIE DEBUG ===" -ForegroundColor Cyan
+Write-Host "=== LAUNCHING DEBUG BUILD SCRIPT ===" -ForegroundColor Cyan
 
-# Automatyczne tworzenie folderu i konfiguracja CMake, jeśli nie istnieje
 if (-not (Test-Path "build-Debug")) {
-    Write-Host "Folder build-Debug nie istnieje. Generowanie konfiguracji CMake..." -ForegroundColor Yellow
+    Write-Host "build-Debug doesn't exist. Generating CMake configuration..." -ForegroundColor Yellow
     cmake -S . -B build-Debug -DCMAKE_BUILD_TYPE=Debug -G Ninja
 }
 
@@ -10,8 +9,8 @@ if (-not (Test-Path "build-Debug")) {
 cmake --build "build-Debug" --config Debug --target all
 
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "=== BUDOWANIE DEBUG ZAKONCZONE SUKCESEM ===" -ForegroundColor Green
+    Write-Host "=== DEBUG BUILD COMPLETED SUCCESSFULLY ===" -ForegroundColor Green
 } else {
-    Write-Host "=== BLAD BUDOWANIA DEBUG ===" -ForegroundColor Red
+    Write-Host "=== ERROR DURING DEBUG BUILD ===" -ForegroundColor Red
     exit $LASTEXITCODE
 }
