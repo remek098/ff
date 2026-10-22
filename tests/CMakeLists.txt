@@ -11,9 +11,10 @@ target_link_libraries(main PRIVATE
 
 
 if(WIN32)
-    add_custom_command(TARGET your_target POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different 
-        "${CMAKE_SOURCE_DIR}/vendor/sdl3/lib/SDL3.dll" 
-        $<TARGET_FILE_DIR:your_target>
+    add_custom_command(TARGET main POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${VENDOR_DIR}/sdl3/lib/SDL3.dll"
+        $<TARGET_FILE_DIR:main>
+        COMMENT "Copying SDL3.dll to output directory..."
     )
 endif()
