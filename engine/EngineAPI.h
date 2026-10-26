@@ -13,3 +13,4 @@
 // #include "../vendor/sdl3/include/SDL3/SDL_main.h"
 
 #include "core/logging/logger.h"
+#include "core/input/input_system.h"

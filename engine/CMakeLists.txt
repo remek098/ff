@@ -1,4 +1,5 @@
 file(GLOB_RECURSE ENGINE_SOURCES 
+    CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
 )
@@ -17,10 +18,8 @@ list(APPEND ENGINE_SOURCES
 
 add_subdirectory("${CMAKE_SOURCE_DIR}/vendor/spdlog" "${CMAKE_BINARY_DIR}/vendor/spdlog" EXCLUDE_FROM_ALL)
 
-# Tworzymy bibliotekę statyczną o nazwie 'engine'
 add_library(engine STATIC ${ENGINE_SOURCES})
 
-# Nagłówki, które silnik potrzebuje do skompilowania samego siebie
 target_include_directories(engine PUBLIC 
     ${CMAKE_CURRENT_SOURCE_DIR}           
     ${Vulkan_INCLUDE_DIRS}                      # Vulkan SDK
@@ -31,13 +30,6 @@ target_include_directories(engine PUBLIC
     "${IMGUI_DIR}/backends"                     # ImGui backends
 )
 
-
-
-# # Linkowanie bibliotek do silnika przy użyciu PEŁNYCH ŚCIEŻEK
-# target_link_libraries(engine PUBLIC
-#     Vulkan::Vulkan
-#     "${VENDOR_DIR}/sdl3/lib/SDL3.lib"     # <--- KLUCZOWA ZMIANA: Pełna ścieżka zamiast samego "-lSDL3"
-# )
 
 target_link_libraries(engine PUBLIC
     Vulkan::Vulkan

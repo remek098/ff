@@ -1,11 +1,13 @@
 #include "logger.h"
-#include <spdlog/sinks/stdout_color_sinks.h>
-#include <spdlog/sinks/basic_file_sink.h>
-#include <vector>
 #include <memory>
+#include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <vector>
 
 namespace ff::log {
-void Logger::initialize() {
+
+void
+Logger::initialize() {
     try {
         // Heavy spdlog setup happens exactly ONCE here in this translation unit
         auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
@@ -14,19 +16,19 @@ void Logger::initialize() {
         console_sink->set_pattern("[%^%l%$]: %v");
         file_sink->set_pattern("[%l]: %v");
 
-        std::vector<spdlog::sink_ptr> sinks { console_sink, file_sink };
-        auto logger = std::make_shared<spdlog::logger>("RD_ENGINE", sinks.begin(), sinks.end());
+        std::vector<spdlog::sink_ptr> sinks{console_sink, file_sink};
+        auto logger = std::make_shared<spdlog::logger>("FF", sinks.begin(), sinks.end());
 
         spdlog::register_logger(logger);
         spdlog::set_default_logger(logger);
         spdlog::set_level(spdlog::level::trace);
-    } 
-    catch (const spdlog::spdlog_ex& ex) {
+    } catch (const spdlog::spdlog_ex &ex) {
         // Handle exception
     }
 }
 
-void Logger::shutdown() {
+void
+Logger::shutdown() {
     spdlog::shutdown();
 }
 

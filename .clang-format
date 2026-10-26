@@ -1,0 +1,14 @@
+Language: Cpp
+BasedOnStyle: LLVM
+
+# Puts the return type on its own line for top-level function definitions
+AlwaysBreakAfterReturnType: TopLevelDefinitions
+
+# General formatting constraints
+ColumnLimit: 120
+IndentWidth: 4
+UseTab: Never
+
+# Control how statements and operands break
+AlignOperands: true
+BreakBeforeTernaryOperators: true
