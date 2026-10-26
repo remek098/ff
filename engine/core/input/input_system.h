@@ -92,4 +92,4 @@ private:
 } // namespace ff::input
 
 // Convenient macro shortcut
-#define FInputMgr ff::input::InputManager::get()
+#define FInputManager ff::input::InputManager::get()
