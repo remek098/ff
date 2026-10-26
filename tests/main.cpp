@@ -5,6 +5,8 @@
 #include <stdbool.h>
 
 int main(int argc, char* argv[]) {
+    initialize_logging();
+
     vkb::DeviceError error{};
     // 1. Inicjalizacja wideo SDL
     if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -28,14 +30,16 @@ int main(int argc, char* argv[]) {
     );
 
     if (window == NULL) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Nie udalo sie utworzyc okna: %s\n", SDL_GetError());
+        // SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Nie udalo sie utworzyc okna: %s\n", SDL_GetError());
+        FERROR("SDL failed to create window: {}", SDL_GetError());
         SDL_Quit();
         return 1;
     }
 
     // 3. DOPIERO TERAZ ŁADUJEMY BIBLIOTEKĘ VULKAN
     if (!SDL_Vulkan_LoadLibrary(NULL)) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Nie udalo sie zaladowac Vulkana: %s\n", SDL_GetError());
+        // SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Nie udalo sie zaladowac Vulkana: %s\n", SDL_GetError());
+        FERROR("SDL failed to load vulkan : {}", SDL_GetError());
         SDL_DestroyWindow(window);
         SDL_Quit();
         return 1;
@@ -45,12 +49,13 @@ int main(int argc, char* argv[]) {
     Uint32 extensionCount = 0;
     const char * const *extensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
     if (!extensions) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Brak rozszerzen: %s\n", SDL_GetError());
+        // SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Brak rozszerzen: %s\n", SDL_GetError());
+        FERROR("Failed to load extensions: {}", SDL_GetError());
     } else {
         printf("\n=== VULKAN URUCHOMIONY POMYSLNIE ===\n");
         printf("Wymagane rozszerzenia Vulkan przez SDL (%d):\n", extensionCount);
         for (Uint32 i = 0; i < extensionCount; i++) {
-            printf(" - %s\n", extensions[i]);
+            printf("%s\n", extensions[i]);
         }
         printf("====================================\n\n");
     }
@@ -58,6 +63,8 @@ int main(int argc, char* argv[]) {
     // 5. Pętla programu (teraz okno utrzyma się na ekranie)
     bool running = true;
     SDL_Event event;
+
+    FINFO("initialized SDL window successfully.");
 
     while (running) {
         while (SDL_PollEvent(&event)) {
@@ -72,5 +79,8 @@ int main(int argc, char* argv[]) {
     SDL_Vulkan_UnloadLibrary();
     SDL_Quit();
 
+    FINFO("Closed SDL window.");
+
+    shutdown_logging();
     return 0;
 }

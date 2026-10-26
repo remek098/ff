@@ -15,6 +15,8 @@ list(APPEND ENGINE_SOURCES
     "${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp"
 )
 
+add_subdirectory("${CMAKE_SOURCE_DIR}/vendor/spdlog" "${CMAKE_BINARY_DIR}/vendor/spdlog" EXCLUDE_FROM_ALL)
+
 # Tworzymy bibliotekę statyczną o nazwie 'engine'
 add_library(engine STATIC ${ENGINE_SOURCES})
 
@@ -40,4 +42,5 @@ target_include_directories(engine PUBLIC
 target_link_libraries(engine PUBLIC
     Vulkan::Vulkan
     SDL3::SDL3
+    spdlog::spdlog
 )
