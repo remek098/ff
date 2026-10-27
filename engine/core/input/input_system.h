@@ -1,8 +1,6 @@
 #pragma once
 
-#include "defines.h"
-#include "SDL3/SDL_scancode.h"
-#include "SDL3/SDL.h"
+#include "input_types.h"
 #include <array>
 #include <unordered_map>
 
@@ -10,16 +8,13 @@
 namespace ff::input {
 
 struct KeyboardState {
-    // SDL_SCANCODE_COUNT gives the exact size needed for all standard keyboard keys
-    std::array<bool, SDL_SCANCODE_COUNT> current{};
-    std::array<bool, SDL_SCANCODE_COUNT> previous{};
+    std::array<bool, KeyboardKeys::COUNT> current{};
+    std::array<bool, KeyboardKeys::COUNT> previous{};
 };
 
 struct MouseState {
-    static constexpr i32 MAX_BUTTONS = 8;
-
-    std::array<bool, MAX_BUTTONS> current{};
-    std::array<bool, MAX_BUTTONS> previous{};
+    std::array<bool, MouseButton::COUNT> current{};
+    std::array<bool, MouseButton::COUNT> previous{};
 
     // Optional: It's usually handy to store mouse positions/scroll here too
     f32 x{0.f};
@@ -33,15 +28,6 @@ struct InputSystemState {
     MouseState mouse;
 };
 
-struct MouseButton {
-    enum Value : i32 {
-        Left    = SDL_BUTTON_LEFT - 1,
-        Middle  = SDL_BUTTON_MIDDLE - 1,
-        Right   = SDL_BUTTON_RIGHT - 1,
-        X1      = SDL_BUTTON_X1 - 1,
-        X2      = SDL_BUTTON_X2 - 1
-    };
-};
 
 
 class InputManager {
@@ -64,14 +50,14 @@ public:
     void handle_event(const SDL_Event& event);
 
     // Keyboard Queries
-    bool is_key_down(SDL_WindowID window_id, SDL_Scancode key) const;
-    bool is_key_up(SDL_WindowID window_id, SDL_Scancode key) const;
-    bool is_key_pressed(SDL_WindowID window_id, SDL_Scancode key) const;
-    bool is_key_released(SDL_WindowID window_id, SDL_Scancode key) const;
+    bool is_key_down(SDL_WindowID window_id, KeyboardKeys::Value key) const;
+    bool is_key_up(SDL_WindowID window_id, KeyboardKeys::Value key) const;
+    bool is_key_pressed(SDL_WindowID window_id, KeyboardKeys::Value key) const;
+    bool is_key_released(SDL_WindowID window_id, KeyboardKeys::Value key) const;
 
     // Previous Frame Keyboard Queries (State during last frame)
-    bool was_key_down(SDL_WindowID window_id, SDL_Scancode key) const;
-    bool was_key_up(SDL_WindowID window_id, SDL_Scancode key) const;
+    bool was_key_down(SDL_WindowID window_id, KeyboardKeys::Value key) const;
+    bool was_key_up(SDL_WindowID window_id, KeyboardKeys::Value key) const;
 
 
     // Mouse Button Queries

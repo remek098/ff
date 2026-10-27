@@ -73,18 +73,18 @@ Application::handle_input() {
     //       so overall quite cheap operations to make.
     //       Obviously we want as little if statements as possible so we would only check for specific keys/combinations
     //       of keys application needs -> e.g. Esc, Ctrl+Shift+S, etc.
-    if (FInputManager.is_key_pressed(window_id, SDL_SCANCODE_ESCAPE)) {
+    if (FInputManager.is_key_pressed(window_id, input::KeyboardKeys::ESCAPE)) {
         FINFO("ESC key pressed - exiting loop.");
         is_running = false;
     }
 
-    if (FInputManager.is_key_pressed(window_id, SDL_SCANCODE_SPACE)) {
+    if (FInputManager.is_key_pressed(window_id, input::KeyboardKeys::SPACE)) {
         FINFO("Space bar pressed this frame!");
     }
 
-    if (FInputManager.is_key_down(window_id, SDL_SCANCODE_LCTRL) &&
-        FInputManager.is_key_down(window_id, SDL_SCANCODE_LSHIFT) &&
-        FInputManager.is_key_pressed(window_id, SDL_SCANCODE_S)) {
+    if (FInputManager.is_key_down(window_id, input::KeyboardKeys::LCTRL) &&
+        FInputManager.is_key_down(window_id, input::KeyboardKeys::LSHIFT) &&
+        FInputManager.is_key_pressed(window_id, input::KeyboardKeys::S)) {
         FINFO("Ctrl+Shift+S pressed.");
     }
 
