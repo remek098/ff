@@ -24,7 +24,8 @@ Application::init() {
     name = "ff window debug"; // Fallback for Debug (when NDEBUG is not defined)
 #endif
 
-    window = SDL_CreateWindow(name, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, SDL_WINDOW_VULKAN);
+    window = SDL_CreateWindow(name, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT,
+                              SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_MOUSE_CAPTURE);
     if (window == nullptr) {
         FERROR("SDL failed to create window: {}", SDL_GetError());
         SDL_Quit();
@@ -103,22 +104,52 @@ void
 Application::update(f32 dt) {
     SDL_Event event;
 
-    while (is_running) {
-        FInputManager.prepare_for_new_frame();
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT) {
-                is_running = false;
-            }
+    FInputManager.prepare_for_new_frame();
+    while (SDL_PollEvent(&event)) {
+        switch (event.type) {
+        case SDL_EVENT_QUIT: {
+            is_running = false;
+        } break;
 
-            // feed events into our input manager
-            FInputManager.handle_event(event);
+        case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: {
+            swapchain_resize_requested = true;
+            FINFO("Swapchain resize requested.");
+        } break;
+
+        case SDL_EVENT_WINDOW_MINIMIZED: {
+            is_minimized = true;
+            FINFO("Window minimized");
+        } break;
+
+        case SDL_EVENT_WINDOW_RESTORED: {
+            is_minimized = false;
+            swapchain_resize_requested = true;
+            FINFO("Window restored");
+        } break;
+
+        default:
+            break;
         }
-        handle_input();
+
+        // feed events into our input manager
+        FInputManager.handle_event(event);
     }
+    handle_input();
 }
 
 void
-Application::render() {}
+Application::render() {
+    if(swapchain_resize_requested && !is_minimized) {
+        i32 width, height;
+        SDL_GetWindowSizeInPixels(window, &width, &height);
+        if(width > 0 && height > 0) {
+            FDEBUG("TODO: recreate or request renderer to recreate a swapchain. ({}, {})", width, height);
+            swapchain_resize_requested = false;
+        }
+    }
+
+    if(is_minimized) return;
+}
 
 void
 Application::shutdown() {
@@ -135,7 +166,10 @@ Application::shutdown() {
 void
 Application::run() {
     init();
-    update(10.f);
+    while(is_running) {
+        update(10.f);
+        render();
+    }
     shutdown();
 }
 

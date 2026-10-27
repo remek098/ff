@@ -25,6 +25,8 @@ class Application {
 
   protected:
     bool is_running{false};
+    bool is_minimized{false};
+    bool swapchain_resize_requested{false};
     SDL_Window *window{nullptr};
 };
 
