@@ -7,6 +7,7 @@ file(GLOB_RECURSE ENGINE_SOURCES
 set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/vendor/imgui")
 
 list(APPEND ENGINE_SOURCES
+    "${CMAKE_SOURCE_DIR}/vendor/vkb/src/VkBootstrap.cpp"
     "${IMGUI_DIR}/imgui.cpp"
     "${IMGUI_DIR}/imgui_demo.cpp"
     "${IMGUI_DIR}/imgui_draw.cpp"
@@ -29,7 +30,6 @@ target_include_directories(engine PUBLIC
     "${IMGUI_DIR}"                              # ImGui
     "${IMGUI_DIR}/backends"                     # ImGui backends
 )
-
 
 target_link_libraries(engine PUBLIC
     Vulkan::Vulkan

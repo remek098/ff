@@ -29,7 +29,7 @@ InputManager::prepare_for_new_frame() {
 bool
 InputManager::is_key_down(SDL_WindowID window_id, KeyboardKeys::Value key) const {
     auto it = m_window_states.find(window_id);
-    if (it != m_window_states.end() && key < SDL_SCANCODE_COUNT) {
+    if (it != m_window_states.end() && key < KeyboardKeys::COUNT) {
         return it->second.keyboard.current[key];
     }
     return false;
@@ -43,7 +43,7 @@ InputManager::is_key_up(SDL_WindowID window_id, KeyboardKeys::Value key) const {
 bool
 InputManager::is_key_pressed(SDL_WindowID window_id, KeyboardKeys::Value key) const {
     auto it = m_window_states.find(window_id);
-    if (it != m_window_states.end() && key < SDL_SCANCODE_COUNT) {
+    if (it != m_window_states.end() && key < KeyboardKeys::COUNT) {
         return it->second.keyboard.current[key] && !it->second.keyboard.previous[key];
     }
     return false;
@@ -52,7 +52,7 @@ InputManager::is_key_pressed(SDL_WindowID window_id, KeyboardKeys::Value key) co
 bool
 InputManager::is_key_released(SDL_WindowID window_id, KeyboardKeys::Value key) const {
     auto it = m_window_states.find(window_id);
-    if (it != m_window_states.end() && key < SDL_SCANCODE_COUNT) {
+    if (it != m_window_states.end() && key < KeyboardKeys::COUNT) {
         return !it->second.keyboard.current[key] && it->second.keyboard.previous[key];
     }
     return false;
@@ -123,7 +123,7 @@ InputManager::get_mouse_scroll_y(SDL_WindowID window_id) const {
 bool
 InputManager::was_key_down(SDL_WindowID window_id, KeyboardKeys::Value key) const {
     auto it = m_window_states.find(window_id);
-    if (it != m_window_states.end() && key < SDL_SCANCODE_COUNT) {
+    if (it != m_window_states.end() && key < KeyboardKeys::COUNT) {
         return it->second.keyboard.previous[key];
     }
     return false;

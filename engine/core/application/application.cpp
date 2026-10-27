@@ -7,8 +7,10 @@
 
 namespace ff {
 
+Application::Application(const char *name, u32 width, u32 height) { init(name, width, height); }
+
 bool
-Application::init() {
+Application::init(const char *name, u32 width, u32 height) {
     initialize_logging();
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -16,23 +18,12 @@ Application::init() {
         return false;
     }
 
-    const char *name = "ff window default";
-
-#if defined(NDEBUG)
-    name = "ff window release";
-#else
-    name = "ff window debug"; // Fallback for Debug (when NDEBUG is not defined)
-#endif
-
-    window = SDL_CreateWindow(name, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT,
-                              SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_MOUSE_CAPTURE);
-    if (window == nullptr) {
+    window = SDL_CreateWindow(name, width, height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_MOUSE_CAPTURE);
+    if (!window) {
         FERROR("SDL failed to create window: {}", SDL_GetError());
         SDL_Quit();
         return false;
     }
-
-    FInputManager.register_window(window);
 
     if (!SDL_Vulkan_LoadLibrary(NULL)) {
         FERROR("SDL failed to load vulkan : {}", SDL_GetError());
@@ -48,17 +39,36 @@ Application::init() {
         SDL_DestroyWindow(window);
         SDL_Quit();
         return false;
-    } else {
-        printf("\n=== SDL VULKAN INITIALIZED SUCCESSFULLY ===\n");
-        printf("Vulkan extensions required by SDL (%d):\n", extensionCount);
-        for (Uint32 i = 0; i < extensionCount; i++) {
-            printf("%s\n", extensions[i]);
-        }
-        printf("====================================\n\n");
+    } 
+    // else {
+    //     printf("\n=== SDL VULKAN INITIALIZED SUCCESSFULLY ===\n");
+    //     printf("Vulkan extensions required by SDL (%d):\n", extensionCount);
+    //     for (Uint32 i = 0; i < extensionCount; i++) {
+    //         printf("%s\n", extensions[i]);
+    //     }
+    //     printf("====================================\n\n");
+    // }
+    if (!context.init_instance(name, extensionCount, extensions)) {
+        FERROR("Failed to initialize Vulkan Instance!");
+        return false;
     }
 
-    FINFO("initialized SDL window successfully.");
+    if (!SDL_Vulkan_CreateSurface(window, context.vkb_instance.instance, nullptr, &surface)) {
+        FERROR("Failed to create Vulkan surface! SDL Error: {}", SDL_GetError());
+        return false;
+    }
+    
+    if (!context.init_device(surface)) {
+        FERROR("Failed to init graphics::GraphicsContext::vkb_device during Application init!");
+        return false;
+    }
 
+    VkExtent2D extent = get_window_extent();
+    swapchain.create(context, surface, extent.width, extent.height);
+
+    FInputManager.register_window(window);
+
+    FINFO("initialized SDL window successfully.");
     is_running = true;
     FINFO("Application initialized successfully.");
     return true;
@@ -101,6 +111,31 @@ Application::handle_input() {
 }
 
 void
+Application::handle_resize() {
+    FDEBUG("Hello from handle_resize()");
+    VkExtent2D extent = get_window_extent();
+    
+    // Pause rendering if minimized
+    if (extent.width == 0 || extent.height == 0) {
+        is_minimized = true;
+        return;
+    }
+    is_minimized = false;
+
+    // Recreate the swapchain safely
+    vkDeviceWaitIdle(context.vkb_device.device);
+    swapchain.recreate(context, surface, extent.width, extent.height);
+    swapchain_resize_requested = false;
+}
+
+VkExtent2D
+Application::get_window_extent() const {
+    i32 w = 0, h = 0;
+    SDL_GetWindowSizeInPixels(window, &w, &h);
+    return VkExtent2D{ static_cast<u32>(w), static_cast<u32>(h) };
+}
+
+void
 Application::update(f32 dt) {
     SDL_Event event;
 
@@ -139,20 +174,32 @@ Application::update(f32 dt) {
 
 void
 Application::render() {
-    if(swapchain_resize_requested && !is_minimized) {
+    if (swapchain_resize_requested && !is_minimized) {
         i32 width, height;
         SDL_GetWindowSizeInPixels(window, &width, &height);
-        if(width > 0 && height > 0) {
+        if (width > 0 && height > 0) {
             FDEBUG("TODO: recreate or request renderer to recreate a swapchain. ({}, {})", width, height);
-            swapchain_resize_requested = false;
+            // swapchain_resize_requested = false;
+            handle_resize();
         }
     }
 
-    if(is_minimized) return;
+    if (is_minimized)
+        return;
 }
 
 void
 Application::shutdown() {
+    vkDeviceWaitIdle(context.vkb_device.device);
+
+    // Clean up in reverse creation order
+    swapchain.destroy(context);
+    if (surface != VK_NULL_HANDLE) {
+        vkDestroySurfaceKHR(context.vkb_instance.instance, surface, nullptr);
+        surface = VK_NULL_HANDLE;
+    }
+    context.destroy();
+
     FInputManager.unregister_window(window); // SDL_GetWindowFromID(window_id)
     SDL_DestroyWindow(window);
     SDL_Vulkan_UnloadLibrary();
@@ -165,8 +212,8 @@ Application::shutdown() {
 
 void
 Application::run() {
-    init();
-    while(is_running) {
+    // init();
+    while (is_running) {
         update(10.f);
         render();
     }

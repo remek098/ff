@@ -6,7 +6,7 @@
 
 int
 main(int argc, char *argv[]) {
-    ff::Application app{};
+    ff::Application app{"ff window"};
     app.run();
     
     return 0;
