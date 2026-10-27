@@ -33,6 +33,16 @@ struct InputSystemState {
     MouseState mouse;
 };
 
+struct MouseButton {
+    enum Value : i32 {
+        Left    = SDL_BUTTON_LEFT - 1,
+        Middle  = SDL_BUTTON_MIDDLE - 1,
+        Right   = SDL_BUTTON_RIGHT - 1,
+        X1      = SDL_BUTTON_X1 - 1,
+        X2      = SDL_BUTTON_X2 - 1
+    };
+};
+
 
 class InputManager {
 public:
@@ -65,14 +75,14 @@ public:
 
 
     // Mouse Button Queries
-    bool is_mouse_button_down(SDL_WindowID window_id, i32 button) const;
-    bool is_mouse_button_up(SDL_WindowID window_id, i32 button) const;
-    bool is_mouse_button_pressed(SDL_WindowID window_id, i32 button) const;
-    bool is_mouse_button_released(SDL_WindowID window_id, i32 button) const;
+    bool is_mouse_button_down(SDL_WindowID window_id, MouseButton::Value button) const;
+    bool is_mouse_button_up(SDL_WindowID window_id, MouseButton::Value button) const;
+    bool is_mouse_button_pressed(SDL_WindowID window_id, MouseButton::Value button) const;
+    bool is_mouse_button_released(SDL_WindowID window_id, MouseButton::Value button) const;
 
     // Previous Frame Mouse Button Queries (State during last frame)
-    bool was_mouse_button_down(SDL_WindowID window_id, i32 button) const;
-    bool was_mouse_button_up(SDL_WindowID window_id, i32 button) const;
+    bool was_mouse_button_down(SDL_WindowID window_id, MouseButton::Value button) const;
+    bool was_mouse_button_up(SDL_WindowID window_id, MouseButton::Value button) const;
 
     // Mouse Coordinates & Scroll Getters
     f32 get_mouse_x(SDL_WindowID window_id) const;

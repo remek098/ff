@@ -6,14 +6,14 @@
             // Domyślny debuger dla Linux / macOS (wymaga CodeLLDB lub wbudowanego lldb)
             "type": "lldb", 
             "request": "launch",
-            "program": "${workspaceFolder}/build-${input:buildType}/bin/main", // brak .exe na Unixach
+            "program": "${workspaceFolder}/build-${input:buildType}/bin/test",
             "cwd": "${workspaceFolder}/build-${input:buildType}/bin",
             "console": "integratedTerminal",
             
             // --- NACPISANIE DLA WINDOWS ---
             "windows": {
                 "type": "cppvsdbg",
-                "program": "${workspaceFolder}\\build-${input:buildType}\\bin\\main.exe",
+                "program": "${workspaceFolder}\\build-${input:buildType}\\bin\\test.exe",
                 "cwd": "${workspaceFolder}\\build-${input:buildType}\\bin"
             },
             
@@ -24,7 +24,7 @@
         {
             "id": "buildType",
             "type": "pickString",
-            "description": "Wybierz konfigurację:",
+            "description": "Select configuration:",
             "options": ["Debug", "Release"],
             "default": "Debug"
         }

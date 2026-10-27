@@ -61,7 +61,7 @@ InputManager::is_key_released(SDL_WindowID window_id, SDL_Scancode key) const {
 // --- MOUSE BUTTON QUERIES ---
 
 bool
-InputManager::is_mouse_button_down(SDL_WindowID window_id, i32 button) const {
+InputManager::is_mouse_button_down(SDL_WindowID window_id, MouseButton::Value button) const {
     auto it = m_window_states.find(window_id);
     if (it != m_window_states.end() && button >= 0 && button < MouseState::MAX_BUTTONS) {
         return it->second.mouse.current[button];
@@ -70,12 +70,12 @@ InputManager::is_mouse_button_down(SDL_WindowID window_id, i32 button) const {
 }
 
 bool
-InputManager::is_mouse_button_up(SDL_WindowID window_id, i32 button) const {
+InputManager::is_mouse_button_up(SDL_WindowID window_id, MouseButton::Value button) const {
     return !is_mouse_button_down(window_id, button);
 }
 
 bool
-InputManager::is_mouse_button_pressed(SDL_WindowID window_id, i32 button) const {
+InputManager::is_mouse_button_pressed(SDL_WindowID window_id, MouseButton::Value button) const {
     auto it = m_window_states.find(window_id);
     if (it != m_window_states.end() && button >= 0 && button < MouseState::MAX_BUTTONS) {
         return it->second.mouse.current[button] && !it->second.mouse.previous[button];
@@ -84,7 +84,7 @@ InputManager::is_mouse_button_pressed(SDL_WindowID window_id, i32 button) const 
 }
 
 bool
-InputManager::is_mouse_button_released(SDL_WindowID window_id, i32 button) const {
+InputManager::is_mouse_button_released(SDL_WindowID window_id, MouseButton::Value button) const {
     auto it = m_window_states.find(window_id);
     if (it != m_window_states.end() && button >= 0 && button < MouseState::MAX_BUTTONS) {
         return !it->second.mouse.current[button] && it->second.mouse.previous[button];
@@ -137,7 +137,7 @@ InputManager::was_key_up(SDL_WindowID window_id, SDL_Scancode key) const {
 // --- PREVIOUS FRAME MOUSE BUTTON QUERIES ---
 
 bool
-InputManager::was_mouse_button_down(SDL_WindowID window_id, i32 button) const {
+InputManager::was_mouse_button_down(SDL_WindowID window_id, MouseButton::Value button) const {
     auto it = m_window_states.find(window_id);
     if (it != m_window_states.end() && button >= 0 && button < MouseState::MAX_BUTTONS) {
         return it->second.mouse.previous[button];
@@ -146,7 +146,7 @@ InputManager::was_mouse_button_down(SDL_WindowID window_id, i32 button) const {
 }
 
 bool
-InputManager::was_mouse_button_up(SDL_WindowID window_id, i32 button) const {
+InputManager::was_mouse_button_up(SDL_WindowID window_id, MouseButton::Value button) const {
     return !was_mouse_button_down(window_id, button);
 }
 
