@@ -18,7 +18,8 @@ Application::init(const char *name, u32 width, u32 height) {
         return false;
     }
 
-    window = SDL_CreateWindow(name, width, height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_MOUSE_CAPTURE);
+    window = SDL_CreateWindow(
+        name, width, height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_MOUSE_CAPTURE);
     if (!window) {
         FERROR("SDL failed to create window: {}", SDL_GetError());
         SDL_Quit();
@@ -32,14 +33,14 @@ Application::init(const char *name, u32 width, u32 height) {
         return false;
     }
 
-    Uint32 extensionCount = 0;
-    const char *const *extensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
+    Uint32             extensionCount = 0;
+    const char *const *extensions     = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
     if (!extensions) {
         FERROR("Failed to load extensions: {}", SDL_GetError());
         SDL_DestroyWindow(window);
         SDL_Quit();
         return false;
-    } 
+    }
     // else {
     //     printf("\n=== SDL VULKAN INITIALIZED SUCCESSFULLY ===\n");
     //     printf("Vulkan extensions required by SDL (%d):\n", extensionCount);
@@ -57,7 +58,7 @@ Application::init(const char *name, u32 width, u32 height) {
         FERROR("Failed to create Vulkan surface! SDL Error: {}", SDL_GetError());
         return false;
     }
-    
+
     if (!context.init_device(surface)) {
         FERROR("Failed to init graphics::GraphicsContext::vkb_device during Application init!");
         return false;
@@ -78,11 +79,11 @@ void
 Application::handle_input() {
     SDL_WindowID window_id = SDL_GetWindowID(window);
 
-    // NOTE: all FInputManager at this point does here is just check in arrays if the states match to certain expected
-    // situation.
+    // NOTE: all FInputManager at this point does here is just check in arrays if the states match
+    // to certain expected situation.
     //       so overall quite cheap operations to make.
-    //       Obviously we want as little if statements as possible so we would only check for specific keys/combinations
-    //       of keys application needs -> e.g. Esc, Ctrl+Shift+S, etc.
+    //       Obviously we want as little if statements as possible so we would only check for
+    //       specific keys/combinations of keys application needs -> e.g. Esc, Ctrl+Shift+S, etc.
     if (FInputManager.is_key_pressed(window_id, input::KeyboardKeys::ESCAPE)) {
         FINFO("ESC key pressed - exiting loop.");
         is_running = false;
@@ -92,20 +93,22 @@ Application::handle_input() {
         FINFO("Space bar pressed this frame!");
     }
 
-    if (FInputManager.is_key_down(window_id, input::KeyboardKeys::LCTRL) &&
-        FInputManager.is_key_down(window_id, input::KeyboardKeys::LSHIFT) &&
-        FInputManager.is_key_pressed(window_id, input::KeyboardKeys::S)) {
+    if (FInputManager.is_key_down(window_id, input::KeyboardKeys::LCTRL)
+        && FInputManager.is_key_down(window_id, input::KeyboardKeys::LSHIFT)
+        && FInputManager.is_key_pressed(window_id, input::KeyboardKeys::S)) {
         FINFO("Ctrl+Shift+S pressed.");
     }
 
     // Example: Checking mouse button clicks
     if (FInputManager.is_mouse_button_pressed(window_id, input::MouseButton::Left)) {
-        FINFO("Left mouse clicked at coordinates: ({}, {})", FInputManager.get_mouse_x(window_id),
+        FINFO("Left mouse clicked at coordinates: ({}, {})",
+              FInputManager.get_mouse_x(window_id),
               FInputManager.get_mouse_y(window_id));
     }
 
     if (FInputManager.is_mouse_button_pressed(window_id, input::MouseButton::Right)) {
-        FINFO("Right mouse clicked at coordinates: ({}, {})", FInputManager.get_mouse_x(window_id),
+        FINFO("Right mouse clicked at coordinates: ({}, {})",
+              FInputManager.get_mouse_x(window_id),
               FInputManager.get_mouse_y(window_id));
     }
 }
@@ -114,7 +117,7 @@ void
 Application::handle_resize() {
     FDEBUG("Hello from handle_resize()");
     VkExtent2D extent = get_window_extent();
-    
+
     // Pause rendering if minimized
     if (extent.width == 0 || extent.height == 0) {
         is_minimized = true;
@@ -132,7 +135,7 @@ VkExtent2D
 Application::get_window_extent() const {
     i32 w = 0, h = 0;
     SDL_GetWindowSizeInPixels(window, &w, &h);
-    return VkExtent2D{ static_cast<u32>(w), static_cast<u32>(h) };
+    return VkExtent2D{static_cast<u32>(w), static_cast<u32>(h)};
 }
 
 void
@@ -157,7 +160,7 @@ Application::update(f32 dt) {
         } break;
 
         case SDL_EVENT_WINDOW_RESTORED: {
-            is_minimized = false;
+            is_minimized               = false;
             swapchain_resize_requested = true;
             FINFO("Window restored");
         } break;
@@ -178,7 +181,9 @@ Application::render() {
         i32 width, height;
         SDL_GetWindowSizeInPixels(window, &width, &height);
         if (width > 0 && height > 0) {
-            FDEBUG("TODO: recreate or request renderer to recreate a swapchain. ({}, {})", width, height);
+            FDEBUG("TODO: recreate or request renderer to recreate a swapchain. ({}, {})",
+                   width,
+                   height);
             // swapchain_resize_requested = false;
             handle_resize();
         }

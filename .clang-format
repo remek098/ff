@@ -5,10 +5,45 @@ BasedOnStyle: LLVM
 AlwaysBreakAfterReturnType: TopLevelDefinitions
 
 # General formatting constraints
-ColumnLimit: 120
+ColumnLimit: 100
 IndentWidth: 4
 UseTab: Never
 
-# Control how statements and operands break
-AlignOperands: true
-BreakBeforeTernaryOperators: true
+
+AlignConsecutiveAssignments:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: false
+
+AlignConsecutiveDeclarations:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: false
+
+AlignConsecutiveBitFields:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: false
+
+AlignConsecutiveMacros:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: false
+
+DerivePointerAlignment: false
+PointerAlignment: Right  # Keeps `SDL_Window *window` or `u8 *cpu_address` aligned nicely
+
+# Forces alignment to the open bracket on wrap
+AlignAfterOpenBracket: true
+
+# Controls how parameters/elements inside brackets behave when wrapping:
+# 'BlockIndent' or 'Always' helps force structured multi-line layouts
+BinPackParameters: false         # Prevents packing multiple parameters on one line if it wraps, forcing vertical layout
+BinPackArguments: false          # Same for function calls (great for long Vulkan/D3D12 calls)
+AllowAllParametersOfDeclarationOnNextLine: false
+
+# Force breaking before binary operators if you manually break them
+BreakBeforeBinaryOperators: NonAssignment
+
+# Alternatively, if you want binary operands to always stay aligned and wrapped when broken:
+AlignOperands: Align

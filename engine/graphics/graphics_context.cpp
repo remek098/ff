@@ -8,9 +8,10 @@
 namespace ff::graphics {
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL
-vulkan_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                      VkDebugUtilsMessageTypeFlagsEXT messageType,
-                      const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData) {
+vulkan_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
+                      VkDebugUtilsMessageTypeFlagsEXT             messageType,
+                      const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+                      void                                       *pUserData) {
     // You can format the message prefix based on the message type (Validation, Performance, etc.)
     const char *type_str = "Vulkan";
     if (messageType & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) {
@@ -28,16 +29,24 @@ vulkan_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
         FINFO("[{}] {}", type_str, pCallbackData->pMessage);
     }
 
-    // Always return VK_FALSE. Returning VK_TRUE skips the driver action that triggered the layer message.
+    VkBufferCreateInfo buffer_info = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size  = 1024,
+    };
+
+    // Always return VK_FALSE. Returning VK_TRUE skips the driver action that triggered the layer
+    // message.
     return VK_FALSE;
 }
 
 bool
-GraphicsContext::init_instance(const char *app_name, uint32_t ext_count, const char *const *extensions) {
+GraphicsContext::init_instance(const char        *app_name,
+                               uint32_t           ext_count,
+                               const char *const *extensions) {
     vkb::InstanceBuilder instance_builder;
-    auto instance_ret = instance_builder.set_app_name(app_name)
-                            .require_api_version(1, 3, 0)
-                            .enable_extensions(ext_count, extensions)
+    auto                 instance_ret = instance_builder.set_app_name(app_name)
+                                            .require_api_version(1, 3, 0)
+                                            .enable_extensions(ext_count, extensions)
 #if !defined(NDEBUG)
                             .request_validation_layers()
                             .set_debug_callback(vulkan_debug_callback)
@@ -49,9 +58,8 @@ GraphicsContext::init_instance(const char *app_name, uint32_t ext_count, const c
         return false;
     }
 
-    // retrieve created by vkb VkInstance so that we can retrieve VkSurfaceKHR from SDL window we pass as a pointer.
+    // retrieve created by vkb VkInstance.
     vkb_instance = instance_ret.value();
-
     FINFO("vulkan instance created successfully.");
     return true;
 }
@@ -65,7 +73,7 @@ GraphicsContext::init_device(VkSurfaceKHR surface) {
         return false;
 
     vkb::DeviceBuilder device_builder{phys_device_ret.value()};
-    auto device_ret = device_builder.build();
+    auto               device_ret = device_builder.build();
 
     if (!device_ret)
         return false;
