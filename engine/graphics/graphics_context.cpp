@@ -29,10 +29,6 @@ vulkan_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverit
         FINFO("[{}] {}", type_str, pCallbackData->pMessage);
     }
 
-    VkBufferCreateInfo buffer_info = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        .size  = 1024,
-    };
 
     // Always return VK_FALSE. Returning VK_TRUE skips the driver action that triggered the layer
     // message.
@@ -43,7 +39,11 @@ bool
 GraphicsContext::init_instance(const char        *app_name,
                                uint32_t           ext_count,
                                const char *const *extensions) {
-    vkb::InstanceBuilder instance_builder;
+    vkb::InstanceBuilder instance_builder(vkGetInstanceProcAddr);
+#ifdef __APPLE__
+    instance_builder.enable_extension(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME)
+                    .add_validation_feature_enable(VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT); // optional
+#endif
     auto                 instance_ret = instance_builder.set_app_name(app_name)
                                             .require_api_version(1, 3, 0)
                                             .enable_extensions(ext_count, extensions)
