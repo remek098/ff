@@ -36,6 +36,23 @@ add_subdirectory("${VENDOR_DIR}/sdl3")
 add_subdirectory(engine)
 add_subdirectory(tests)
 
+if(APPLE)
+    execute_process(
+        COMMAND brew --prefix
+        OUTPUT_VARIABLE HOMEBREW_PREFIX
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+
+    # Wstrzyknij RPATH bezpośrednio do końcowej binarki 'test'
+    target_link_directories(test PRIVATE "${HOMEBREW_PREFIX}/lib")
+    
+    set_target_properties(test PROPERTIES
+        BUILD_WITH_INSTALL_RPATH TRUE
+        INSTALL_RPATH "${HOMEBREW_PREFIX}/lib"
+        ENVIRONMENT "VK_LAYER_PATH=${HOMEBREW_PREFIX}/share/vulkan/explicit_layer.d"
+    )
+endif()
+
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     # 1. LTO / IPO (Link Time Optimization)
     include(CheckIPOSupported)
