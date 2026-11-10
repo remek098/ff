@@ -1,6 +1,6 @@
 #pragma once
 
-#include "defines.h"
+#include "core/common/common_headers.h"
 #include "SDL3/SDL.h"
 #include "SDL3/SDL_scancode.h"
 

@@ -1,13 +1,47 @@
 #include "application.h"
-#include "core/input/input_system.h"
-#include "core/logging/logger.h"
-
-#include "SDL3/SDL.h"
-#include "SDL3/SDL_vulkan.h"
 
 namespace ff {
 
-Application::Application(const char *name, u32 width, u32 height) { init(name, width, height); }
+Application::Application(const char *name, u32 width, u32 height)
+    : application_name(name ? name : "ff"), window_width(width),
+      window_height(height) { /*init(name, width, height);*/ }
+
+namespace {
+struct GameKeyBinding {
+    std::string                             name;
+    std::vector<input::KeyboardKeys::Value> required_down;
+    input::KeyboardKeys::Value              pressed_this_frame;
+    std::function<void()>                   on_triggered;
+};
+
+struct GameMouseButtonBinding {
+    std::string                             name;
+    std::vector<input::KeyboardKeys::Value> required_down; // e.g., Hold LSHIFT + Click
+    input::MouseButton::Value               button;        // Left, Right, Middle, etc.
+    std::function<void()>                   on_triggered;
+};
+std::vector<GameKeyBinding>         game_key_bindings;
+std::vector<GameMouseButtonBinding> game_mouse_bindings;
+} // namespace
+
+void
+Application::register_key_binding(std::string                             action_name,
+                                  std::vector<input::KeyboardKeys::Value> modifiers,
+                                  input::KeyboardKeys::Value              key,
+                                  std::function<void()>                   callback) {
+    FINFO("Registering game key binding: '{}'", action_name);
+    game_key_bindings.push_back({ std::move(action_name), std::move(modifiers), key, std::move(callback) });
+}
+
+void
+Application::register_mouse_binding(std::string                             action_name,
+                                    std::vector<input::KeyboardKeys::Value> modifiers,
+                                    input::MouseButton::Value               button,
+                                    std::function<void()>                   callback) {
+    FINFO("Registering game mouse binding: '{}'", action_name);
+    game_mouse_bindings.push_back(
+        { std::move(action_name), std::move(modifiers), button, std::move(callback) });
+}
 
 bool
 Application::init(const char *name, u32 width, u32 height) {
@@ -72,45 +106,118 @@ Application::init(const char *name, u32 width, u32 height) {
     FINFO("initialized SDL window successfully.");
     is_running = true;
     FINFO("Application initialized successfully.");
+
+    register_default_input_bindings();
+
     return true;
 }
 
 void
+Application::register_default_input_bindings() {
+    game_mouse_bindings.clear();
+    game_key_bindings.clear();
+    key_bindings.clear(); // just in case if we restart application.
+    key_bindings.push_back(KeyBinding(Action::Quit,
+                                      {},                                 // No modifiers
+                                      input::KeyboardKeys::Value::ESCAPE, // <-- Use Value namespace
+                                      [this]() { on_quit_triggered(); }));
+
+    key_bindings.push_back(KeyBinding(
+        Action::SaveSpecial,
+        { input::KeyboardKeys::Value::LCTRL, input::KeyboardKeys::Value::LSHIFT }, // <-- Use Value namespace
+        input::KeyboardKeys::Value::S,                                             // <-- Use Value namespace
+        []() { FINFO("Ctrl+Shift+S pressed."); }));
+
+    key_bindings.push_back(KeyBinding(Action::Reopen, {}, input::KeyboardKeys::Value::F11, [this]() {
+        shutdown();
+        init(application_name.c_str(), window_width, window_height);
+        FINFO("Relaunching application...");
+    }));
+}
+
+void
+Application::on_quit_triggered() {
+    FINFO("ESC key pressed - closing application...");
+    is_running = false;
+}
+
+void
 Application::handle_input() {
+    triggered_actions_this_frame.clear();
     SDL_WindowID window_id = SDL_GetWindowID(window);
 
-    // NOTE: all FInputManager at this point does here is just check in arrays if the states match
-    // to certain expected situation.
-    //       so overall quite cheap operations to make.
-    //       Obviously we want as little if statements as possible so we would only check for
-    //       specific keys/combinations of keys application needs -> e.g. Esc, Ctrl+Shift+S, etc.
-    if (FInputManager.is_key_pressed(window_id, input::KeyboardKeys::ESCAPE)) {
-        FINFO("ESC key pressed - exiting loop.");
-        is_running = false;
+    // Store callbacks to run AFTER iteration finishes to prevent iterator invalidation
+    std::vector<std::function<void()>> callbacks_to_run;
+
+    // 1. handle key_bindings
+    for (const auto &binding : key_bindings) {
+        bool modifiers_met = true;
+        for (auto mod : binding.required_down) {
+            if (!FInputManager.is_key_down(window_id, mod)) {
+                modifiers_met = false;
+                break;
+            }
+        }
+
+        if (modifiers_met && FInputManager.is_key_pressed(window_id, binding.pressed_this_frame)) {
+            triggered_actions_this_frame.push_back(binding.action);
+            if (binding.on_triggered) {
+                callbacks_to_run.push_back(binding.on_triggered);
+            }
+        }
     }
 
-    if (FInputManager.is_key_pressed(window_id, input::KeyboardKeys::SPACE)) {
-        FINFO("Space bar pressed this frame!");
+    // 2. handle game-specific keybindings
+    for (const auto &binding : game_key_bindings) {
+        bool modifiers_met = true;
+        for (auto mod : binding.required_down) {
+            if (!FInputManager.is_key_down(window_id, mod)) {
+                modifiers_met = false;
+                break;
+            }
+        }
+
+        if (modifiers_met && FInputManager.is_key_pressed(window_id, binding.pressed_this_frame)) {
+            if (binding.on_triggered) {
+                callbacks_to_run.push_back(binding.on_triggered);
+            }
+        }
     }
 
-    if (FInputManager.is_key_down(window_id, input::KeyboardKeys::LCTRL)
-        && FInputManager.is_key_down(window_id, input::KeyboardKeys::LSHIFT)
-        && FInputManager.is_key_pressed(window_id, input::KeyboardKeys::S)) {
-        FINFO("Ctrl+Shift+S pressed.");
+    // handle mouse button bindings.
+    for (const auto &binding : game_mouse_bindings) {
+        bool modifiers_met = true;
+        for (auto mod : binding.required_down) {
+            if (!FInputManager.is_key_down(window_id, mod)) {
+                modifiers_met = false;
+                break;
+            }
+        }
+
+        if (modifiers_met && FInputManager.is_mouse_button_pressed(window_id, binding.button)) {
+            if (binding.on_triggered) {
+                callbacks_to_run.push_back(binding.on_triggered);
+            }
+        }
+    }
+
+    // Execute all collected callbacks safely *after* the loops have safely exited
+    for (const auto &callback : callbacks_to_run) {
+        callback();
     }
 
     // Example: Checking mouse button clicks
-    if (FInputManager.is_mouse_button_pressed(window_id, input::MouseButton::Left)) {
-        FINFO("Left mouse clicked at coordinates: ({}, {})",
-              FInputManager.get_mouse_x(window_id),
-              FInputManager.get_mouse_y(window_id));
-    }
+    // if (FInputManager.is_mouse_button_pressed(window_id, input::MouseButton::Left)) {
+    //     FINFO("Left mouse clicked at coordinates: ({}, {})",
+    //           FInputManager.get_mouse_x(window_id),
+    //           FInputManager.get_mouse_y(window_id));
+    // }
 
-    if (FInputManager.is_mouse_button_pressed(window_id, input::MouseButton::Right)) {
-        FINFO("Right mouse clicked at coordinates: ({}, {})",
-              FInputManager.get_mouse_x(window_id),
-              FInputManager.get_mouse_y(window_id));
-    }
+    // if (FInputManager.is_mouse_button_pressed(window_id, input::MouseButton::Right)) {
+    //     FINFO("Right mouse clicked at coordinates: ({}, {})",
+    //           FInputManager.get_mouse_x(window_id),
+    //           FInputManager.get_mouse_y(window_id));
+    // }
 }
 
 void
@@ -123,7 +230,10 @@ Application::handle_resize() {
         is_minimized = true;
         return;
     }
-    is_minimized = false;
+    is_minimized  = false;
+
+    window_width  = extent.width;
+    window_height = extent.height;
 
     // Recreate the swapchain safely
     vkDeviceWaitIdle(context.vkb_device.device);
@@ -135,42 +245,48 @@ VkExtent2D
 Application::get_window_extent() const {
     i32 w = 0, h = 0;
     SDL_GetWindowSizeInPixels(window, &w, &h);
-    return VkExtent2D{static_cast<u32>(w), static_cast<u32>(h)};
+    return VkExtent2D{ static_cast<u32>(w), static_cast<u32>(h) };
+}
+
+void
+Application::process_sdl_events(const SDL_Event &event) {
+
+    switch (event.type) {
+    case SDL_EVENT_QUIT: {
+        is_running = false;
+    } break;
+
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: {
+        swapchain_resize_requested = true;
+        FINFO("Swapchain resize requested.");
+    } break;
+
+    case SDL_EVENT_WINDOW_MINIMIZED: {
+        is_minimized = true;
+        FINFO("Window minimized");
+    } break;
+
+    case SDL_EVENT_WINDOW_RESTORED: {
+        is_minimized               = false;
+        swapchain_resize_requested = true;
+        FINFO("Window restored");
+    } break;
+
+    default:
+        break;
+    }
+
+    // feed events into our input manager
+    FInputManager.handle_event(event);
 }
 
 void
 Application::update(f32 dt) {
-    SDL_Event event;
-
     FInputManager.prepare_for_new_frame();
+
+    SDL_Event event;
     while (SDL_PollEvent(&event)) {
-        switch (event.type) {
-        case SDL_EVENT_QUIT: {
-            is_running = false;
-        } break;
-
-        case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: {
-            swapchain_resize_requested = true;
-            FINFO("Swapchain resize requested.");
-        } break;
-
-        case SDL_EVENT_WINDOW_MINIMIZED: {
-            is_minimized = true;
-            FINFO("Window minimized");
-        } break;
-
-        case SDL_EVENT_WINDOW_RESTORED: {
-            is_minimized               = false;
-            swapchain_resize_requested = true;
-            FINFO("Window restored");
-        } break;
-
-        default:
-            break;
-        }
-
-        // feed events into our input manager
-        FInputManager.handle_event(event);
+        process_sdl_events(event);
     }
     handle_input();
 }
@@ -181,9 +297,7 @@ Application::render() {
         i32 width, height;
         SDL_GetWindowSizeInPixels(window, &width, &height);
         if (width > 0 && height > 0) {
-            FDEBUG("TODO: recreate or request renderer to recreate a swapchain. ({}, {})",
-                   width,
-                   height);
+            FDEBUG("TODO: recreate or request renderer to recreate a swapchain. ({}, {})", width, height);
             // swapchain_resize_requested = false;
             handle_resize();
         }
@@ -217,7 +331,10 @@ Application::shutdown() {
 
 void
 Application::run() {
-    // init();
+    if (!init(application_name.c_str(), window_width, window_height)) {
+        FERROR("Application initialization failed. Exiting.");
+        return;
+    }
     while (is_running) {
         update(10.f);
         render();

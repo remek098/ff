@@ -5,10 +5,12 @@ BasedOnStyle: LLVM
 AlwaysBreakAfterReturnType: TopLevelDefinitions
 
 # General formatting constraints
-ColumnLimit: 100
+ColumnLimit: 110
 IndentWidth: 4
 UseTab: Never
 
+Cpp11BracedListStyle: false
+AllowShortEnumsOnASingleLine: false
 
 AlignConsecutiveAssignments:
   Enabled: true

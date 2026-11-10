@@ -22,7 +22,8 @@ add_subdirectory("${CMAKE_SOURCE_DIR}/vendor/spdlog" "${CMAKE_BINARY_DIR}/vendor
 add_library(engine STATIC ${ENGINE_SOURCES})
 
 target_include_directories(engine PUBLIC 
-    ${CMAKE_CURRENT_SOURCE_DIR}           
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/core           
     ${Vulkan_INCLUDE_DIRS}                      # Vulkan SDK
     "${CMAKE_SOURCE_DIR}/vendor/vma/include"    # Vulkan Memory Allocator
     "${CMAKE_SOURCE_DIR}/vendor/sdl3/include"   # SDL3

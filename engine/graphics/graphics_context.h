@@ -1,7 +1,7 @@
 #pragma once
 
 #include "VkBootstrap.h"
-#include "defines.h"
+#include "core/common/common_headers.h"
 
 namespace ff::graphics {
 struct GraphicsContext {
