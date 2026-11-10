@@ -53,7 +53,7 @@ Application::init(const char *name, u32 width, u32 height) {
     }
 
     window = SDL_CreateWindow(
-        name, width, height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_MOUSE_CAPTURE);
+        name, width, height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE /*| SDL_WINDOW_MOUSE_CAPTURE*/);
     if (!window) {
         FERROR("SDL failed to create window: {}", SDL_GetError());
         SDL_Quit();
@@ -102,6 +102,8 @@ Application::init(const char *name, u32 width, u32 height) {
     swapchain.create(context, surface, extent.width, extent.height);
 
     FInputManager.register_window(window);
+    // SDL_ShowWindow(window);
+    // SDL_RaiseWindow(window);
 
     FINFO("initialized SDL window successfully.");
     is_running = true;
@@ -239,6 +241,8 @@ Application::handle_resize() {
     vkDeviceWaitIdle(context.vkb_device.device);
     swapchain.recreate(context, surface, extent.width, extent.height);
     swapchain_resize_requested = false;
+
+    FINFO("Resize handled.");
 }
 
 VkExtent2D
