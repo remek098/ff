@@ -6,11 +6,10 @@
 #include "components/transform_component.h"
 #include "components/script_component.h"
 
-#include <Windows.h>
-
 using namespace ff;
 using namespace ff::entity;
 
+#include <Windows.h>
 class beep_script;
 REGISTER_SCRIPT(beep_script);
 class beep_script : public script::ScriptEntity {
@@ -43,6 +42,11 @@ class TestGame : public ff::Application {
             FINFO("Jump action triggered from game code!");
         });
 
+        register_key_binding("Player.NukeScript", {}, input::KeyboardKeys::Value::N, [this]() {
+            FINFO("Pressed key to nuke entity!");
+            if(id::is_valid(_id) && entity::is_alive(_id)) remove_entity(_id);
+        });
+
         register_mouse_binding(
             "Player.Shoot",
             {}, // Optional modifier: Shift + Left Click
@@ -65,7 +69,7 @@ class TestGame : public ff::Application {
     }
 
     void shutdown() override {
-        remove_entity(_id);
+        if(id::is_valid(_id) && entity::is_alive(_id)) remove_entity(_id);
         Application::shutdown();
     }
 
