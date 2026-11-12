@@ -1,16 +1,20 @@
 Language: Cpp
 BasedOnStyle: LLVM
 
+SortIncludes: Never
+
 # Puts the return type on its own line for top-level function definitions
-AlwaysBreakAfterReturnType: TopLevelDefinitions
+AlwaysBreakAfterReturnType: TopLevel
+AllowShortIfStatementsOnASingleLine: WithoutElse
 
 # General formatting constraints
-ColumnLimit: 110
+ColumnLimit: 120
 IndentWidth: 4
 UseTab: Never
 
 Cpp11BracedListStyle: false
 AllowShortEnumsOnASingleLine: false
+
 
 AlignConsecutiveAssignments:
   Enabled: true
@@ -43,6 +47,7 @@ AlignAfterOpenBracket: true
 BinPackParameters: false         # Prevents packing multiple parameters on one line if it wraps, forcing vertical layout
 BinPackArguments: false          # Same for function calls (great for long Vulkan/D3D12 calls)
 AllowAllParametersOfDeclarationOnNextLine: false
+# BreakFunctionDeclarationParameters: true
 
 # Force breaking before binary operators if you manually break them
 BreakBeforeBinaryOperators: NonAssignment

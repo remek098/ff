@@ -3,9 +3,10 @@
 #include "SDL3/SDL.h"
 #include "SDL3/SDL_vulkan.h"
 
-#include "components/components_common.h"
-#include "core/input/input_system.h"
 #include "core/logging/logger.h"
+#include "utils/ftimer.h"
+#include "core/input/input_system.h"
+#include "components/components_common.h"
 #include "graphics/graphics_context.h"
 #include "graphics/swapchain.h"
 #include <string_view>
@@ -17,7 +18,6 @@ enum class Action {
     Quit,
     Jump,
     SaveSpecial,
-
     Reopen,
     Count
 };
@@ -39,14 +39,13 @@ class Application {
   public:
     DISABLE_COPY_AND_MOVE(Application);
     Application() = default;
-    Application(const char *name   = "ff",
-                u32         width  = DEFAULT_WINDOW_WIDTH,
-                u32         height = DEFAULT_WINDOW_HEIGHT);
+    Application(const char *name = "ff", u32 width = DEFAULT_WINDOW_WIDTH, u32 height = DEFAULT_WINDOW_HEIGHT);
     virtual ~Application() = default;
 
     void         run();
 
     SDL_WindowID get_window_id() { return SDL_GetWindowID(window); }
+    SDL_Window  *get_window() { return window; }
 
     void         register_key_binding(std::string                             action_name,
                                       std::vector<input::KeyboardKeys::Value> modifiers,
@@ -92,5 +91,8 @@ class Application {
 
     std::vector<KeyBinding>   key_bindings;
     std::vector<Action>       triggered_actions_this_frame;
+
+    private:
+      utils::ftimer timer{};
 };
 } // namespace ff

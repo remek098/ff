@@ -1,10 +1,20 @@
 #include "application.h"
+#include <format>
 
 namespace ff {
 
+namespace {
+void
+set_sdl_window_title_frame_metrics(SDL_Window *window, const std::string &name, f32 dt, f32 fps) {
+    const std::string title = std::format("{} | {:.2f} ms | {:.1f} FPS", name, dt * 1000.f, fps);
+
+    SDL_SetWindowTitle(window, title.c_str());
+}
+} // namespace
+
 Application::Application(const char *name, u32 width, u32 height)
-    : application_name(name ? name : "ff"), window_width(width),
-      window_height(height) { /*init(name, width, height);*/ }
+    : application_name(name ? name : "ff"), window_width(width), window_height(height) { /*init(name, width, height);*/
+}
 
 namespace {
 struct GameKeyBinding {
@@ -39,8 +49,7 @@ Application::register_mouse_binding(std::string                             acti
                                     input::MouseButton::Value               button,
                                     std::function<void()>                   callback) {
     FINFO("Registering game mouse binding: '{}'", action_name);
-    game_mouse_bindings.push_back(
-        { std::move(action_name), std::move(modifiers), button, std::move(callback) });
+    game_mouse_bindings.push_back({ std::move(action_name), std::move(modifiers), button, std::move(callback) });
 }
 
 bool
@@ -52,8 +61,8 @@ Application::init(const char *name, u32 width, u32 height) {
         return false;
     }
 
-    window = SDL_CreateWindow(
-        name, width, height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE /*| SDL_WINDOW_MOUSE_CAPTURE*/);
+    window =
+        SDL_CreateWindow(name, width, height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE /*| SDL_WINDOW_MOUSE_CAPTURE*/);
     if (!window) {
         FERROR("SDL failed to create window: {}", SDL_GetError());
         SDL_Quit();
@@ -124,11 +133,11 @@ Application::register_default_input_bindings() {
                                       input::KeyboardKeys::Value::ESCAPE, // <-- Use Value namespace
                                       [this]() { on_quit_triggered(); }));
 
-    key_bindings.push_back(KeyBinding(
-        Action::SaveSpecial,
-        { input::KeyboardKeys::Value::LCTRL, input::KeyboardKeys::Value::LSHIFT }, // <-- Use Value namespace
-        input::KeyboardKeys::Value::S,                                             // <-- Use Value namespace
-        []() { FINFO("Ctrl+Shift+S pressed."); }));
+    key_bindings.push_back(
+        KeyBinding(Action::SaveSpecial,
+                   { input::KeyboardKeys::Value::LCTRL, input::KeyboardKeys::Value::LSHIFT }, // <-- Use Value namespace
+                   input::KeyboardKeys::Value::S,                                             // <-- Use Value namespace
+                   []() { FINFO("Ctrl+Shift+S pressed."); }));
 
     key_bindings.push_back(KeyBinding(Action::Reopen, {}, input::KeyboardKeys::Value::F11, [this]() {
         shutdown();
@@ -307,8 +316,7 @@ Application::render() {
         }
     }
 
-    if (is_minimized)
-        return;
+    if (is_minimized) return;
 }
 
 void
@@ -340,8 +348,12 @@ Application::run() {
         return;
     }
     while (is_running) {
-        update(10.f);
+        timer.begin();
+        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        update(timer.dt());
         render();
+
+        if (timer.end()) set_sdl_window_title_frame_metrics(window, application_name, timer.dt_avg(), timer.fps_avg());
     }
     shutdown();
 }

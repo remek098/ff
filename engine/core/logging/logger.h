@@ -45,5 +45,6 @@ public:
 #define FWARN(...)                  log_output(ff::log::log_level::Warning, __VA_ARGS__)
 #define FINFO(...)                  log_output(ff::log::log_level::Info, __VA_ARGS__)
 #define FDEBUG(...)                 log_output(ff::log::log_level::Debug, __VA_ARGS__)
+#define FTRACE(...)                 log_output(ff::log::log_level::Trace, __VA_ARGS__)
 #define FERROR_STR(msg)             log_output(ff::log::log_level::Error, "{}", msg)
 #endif

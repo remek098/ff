@@ -30,6 +30,7 @@ set(SDL_OPENGLES OFF CACHE BOOL "Disable OpenGL ES support" FORCE)
 set(SDL_OPENGL OFF CACHE BOOL "Disable OpenGL support" FORCE)
 
 
+set(SDL_LIBC ON CACHE BOOL "Use system C library" FORCE)
 add_subdirectory("${VENDOR_DIR}/sdl3")
 
 
