@@ -2,31 +2,39 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch (Cross-Platform)",
-            // Domyślny debuger dla Linux / macOS (wymaga CodeLLDB lub wbudowanego lldb)
+            "name": "Launch Application",
             "type": "lldb", 
             "request": "launch",
-            "program": "${workspaceFolder}/build-${input:buildType}/bin/test",
-            "cwd": "${workspaceFolder}/build-${input:buildType}/bin",
+            "program": "${workspaceFolder}/build-Debug/bin/${input:targetApp}",
+            "cwd": "${workspaceFolder}/build-Debug/bin",
             "console": "integratedTerminal",
             
-            // --- NACPISANIE DLA WINDOWS ---
+            // --- WINDOWS OVERRIDE ---
             "windows": {
                 "type": "cppvsdbg",
-                "program": "${workspaceFolder}\\build-${input:buildType}\\bin\\test.exe",
-                "cwd": "${workspaceFolder}\\build-${input:buildType}\\bin"
+                "program": "${workspaceFolder}\\build-Debug\\bin\\${input:targetApp}.exe",
+                "cwd": "${workspaceFolder}\\build-Debug\\bin"
             },
             
-            // "preLaunchTask": "CMake: build"
+            "preLaunchTask": "CMake: build"
         }
     ],
     "inputs": [
         {
-            "id": "buildType",
+            "id": "targetApp",
             "type": "pickString",
-            "description": "Select configuration:",
-            "options": ["Debug", "Release"],
-            "default": "Debug"
+            "description": "Select application to launch:",
+            "options": [
+                {
+                    "label": "editor",
+                    "value": "editor"
+                },
+                {
+                    "label": "tests",
+                    "value": "test"
+                }
+            ],
+            "default": "editor"
         }
     ]
 }

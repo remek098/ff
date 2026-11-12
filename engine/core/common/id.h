@@ -39,7 +39,7 @@ is_valid(Id id) {
 constexpr Id
 index(Id id) {
     Id index{ id & detail::index_mask };
-    FASSERT(index != detail::index_mask,
+    FASSERT_MSG(index != detail::index_mask,
             "id::index(Id): Attempting to extract an index from an invalid or uninitialized entity "
             "ID! You might want to check if id::is_valid(Id)");
     return index;
@@ -59,7 +59,7 @@ new_generation(Id id) {
     // u32 -> 4294967295
 
     // -1 because we count generations from 0. We have to check this
-    FASSERT(generation < (((u64)1 << detail::generation_bits) - 1),
+    FASSERT_MSG(generation < (((u64)1 << detail::generation_bits) - 1),
             "Id::new_generation(Id): New generation would exceed max generation count for current "
             "setup.");
     return index(id) | (generation << detail::index_bits);

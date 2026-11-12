@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
-project(VulkanFrameworkCcpp LANGUAGES CXX)
+project(FfEngineWorkspace LANGUAGES CXX)
+
+option(BUILD_WITH_EDITOR "Build engine with editor support and script name reflection" ON)
 
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
 
@@ -36,6 +38,7 @@ add_subdirectory("${VENDOR_DIR}/sdl3")
 
 add_subdirectory(engine)
 add_subdirectory(tests)
+add_subdirectory(editor)
 
 if(APPLE)
     execute_process(

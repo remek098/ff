@@ -1,3 +1,6 @@
 {
-    "cmake.sourceDirectory": "${workspaceFolder}"
+    "cmake.sourceDirectory": "${workspaceFolder}",
+    "cmake.configureOnOpen": true,
+    "cmake.defaultBuildDirectory": "${workspaceFolder}/build-${command:cmake.buildType}",
+    "cmake.generator": "Ninja"
 }

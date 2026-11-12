@@ -8,3 +8,5 @@ add_executable(test ${TESTS_SOURCES})
 target_link_libraries(test PRIVATE 
     engine
 )
+
+target_compile_definitions(test PRIVATE BUILD_WITH_EDITOR=0)

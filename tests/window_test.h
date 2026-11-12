@@ -2,8 +2,29 @@
 
 #define SDL_MAIN_HANDLED 1
 #include "../engine/EngineAPI.h"
+#include "components/entity_component.h"
+#include "components/transform_component.h"
+#include "components/script_component.h"
+
+#include <Windows.h>
 
 using namespace ff;
+using namespace ff::entity;
+
+class beep_script;
+REGISTER_SCRIPT(beep_script);
+class beep_script : public script::ScriptEntity {
+public:
+    constexpr explicit beep_script(Entity entity)
+        : script::ScriptEntity(entity) {}
+
+    virtual void begin_play() {}
+    virtual void update(f32 dt) {
+        static u32 i = 300;
+        if ( (i++ % 100) == 0 ) Beep(i, 100);
+    }
+private:
+};
 
 class TestGame : public ff::Application {
   public:
@@ -32,7 +53,20 @@ class TestGame : public ff::Application {
                       FInputManager.get_mouse_y(get_window_id()));
             });
 
+        components::TransformComponentInitInfo transform_info{};
+        components::ScriptComponentInitInfo script_info;
+        script_info.script_creator = script::get_script_creator(script::StringHash()("beep_script"));
+        EntityInfo info{};
+        info.transform = &transform_info;
+        info.script = &script_info;
+        _id =  create_entity(info).get_id();
+        
         return true;
+    }
+
+    void shutdown() override {
+        remove_entity(_id);
+        Application::shutdown();
     }
 
     void update(f32 dt) override {
@@ -41,4 +75,7 @@ class TestGame : public ff::Application {
 
         // Put your game-specific per-frame logic here
     }
+
+    private:
+        entity::EntityId _id;
 };

@@ -72,6 +72,10 @@ add_subdirectory("${CMAKE_SOURCE_DIR}/vendor/glm" "${CMAKE_BINARY_DIR}/vendor/gl
 
 add_library(engine STATIC ${ENGINE_SOURCES})
 
+if(BUILD_WITH_EDITOR)
+    target_compile_definitions(engine PUBLIC USE_WITH_EDITOR)
+endif()
+
 target_compile_definitions(engine PRIVATE
     GLM_FORCE_DEPTH_ZERO_TO_ONE
 )

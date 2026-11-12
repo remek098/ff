@@ -1,6 +1,6 @@
 #define TEST_ENTITY_COMPONENTS 0
-#define TEST_WINDOW 1
-#define TEST_RENDERER 0
+#define TEST_WINDOW            1
+#define TEST_RENDERER          0
 
 #if TEST_WINDOW
 #include "window_test.h"

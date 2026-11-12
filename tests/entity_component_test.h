@@ -66,9 +66,9 @@ class TestGame : public ff::Application {
         while (count > 0) {
             ++m_added;
             entity::Entity entity = entity::create_entity(entity_info);
-            FASSERT(entity.is_valid() && id::is_valid(entity.get_id()), "Randomly created entity invalid during test.");
+            FASSERT_MSG(entity.is_valid() && id::is_valid(entity.get_id()), "Randomly created entity invalid during test.");
             m_entities.push_back(entity);
-            FASSERT(entity::is_alive(entity.get_id()), "Randomly created entity is not alive.");
+            FASSERT_MSG(entity::is_alive(entity.get_id()), "Randomly created entity is not alive.");
 
             --count;
         }
@@ -85,7 +85,7 @@ class TestGame : public ff::Application {
             if (entity.is_valid()) {
                 entity::remove_entity(entity.get_id());
                 m_entities.erase(m_entities.begin() + index);
-                FASSERT(!entity::is_alive(entity.get_id()),
+                FASSERT_MSG(!entity::is_alive(entity.get_id()),
                         "Tried to remove randomly generated entity that is not alive.");
                 ++m_removed;
             }

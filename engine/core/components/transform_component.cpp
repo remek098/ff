@@ -33,9 +33,9 @@ ensure_capacity_for_index(u64 entity_index) {
 
 void
 calculate_transform_matrices(id::Id index) {
-    FASSERT(rotations.size() > index, "Internal arrays for TransformComponent have lower size than passed index.");
-    FASSERT(positions.size() > index, "Internal arrays for TransformComponent have lower size than passed index.");
-    FASSERT(scales.size() > index, "Internal arrays for TransformComponent have lower size than passed index.");
+    FASSERT_MSG(rotations.size() > index, "Internal arrays for TransformComponent have lower size than passed index.");
+    FASSERT_MSG(positions.size() > index, "Internal arrays for TransformComponent have lower size than passed index.");
+    FASSERT_MSG(scales.size() > index, "Internal arrays for TransformComponent have lower size than passed index.");
 
     // Build SRT (Scale -> Rotate -> Translate) world matrix
     glm::mat4 translation = glm::translate(glm::mat4(1.0f), positions[index]);
@@ -91,7 +91,7 @@ set_scale(TransformId id, const glm::vec3 &scale) {
 
 TransformComponent
 create_transform_component(const TransformComponentInitInfo &info, entity::Entity entt) {
-    FASSERT(entt.is_valid(), "Cannot create TransformComponent for invalid entity.");
+    FASSERT_MSG(entt.is_valid(), "Cannot create TransformComponent for invalid entity.");
     const id::Id entity_index{ id::index(entt.get_id()) };
 
     ensure_capacity_for_index(entity_index); // makes sure std::vectors are resized properly
@@ -113,7 +113,7 @@ void
 remove_transform_component(TransformComponent component) {
     // NOTE: technically we don't have to clean up positions, rotations and scales utl::vectors there,
     // since create() manages allocation quite well.
-    FASSERT(component.is_valid(), "TransformComponent not valid during remove.");
+    FASSERT_MSG(component.is_valid(), "TransformComponent not valid during remove.");
     const u32 index{ id::index(component.get_id()) };
 
     has_transforms[index]              = 0;
@@ -128,7 +128,7 @@ remove_transform_component(TransformComponent component) {
 
 void
 get_transform_matrices(const entity::EntityId id, glm::mat4x4 &world, glm::mat4x4 &inverse_world) {
-    FASSERT(entity::Entity{ id }.is_valid(), "Trying to get transform matrices from invalid Entity");
+    FASSERT_MSG(entity::Entity{ id }.is_valid(), "Trying to get transform matrices from invalid Entity");
 
     const id::Id entity_index{ id::index(id) };
     if (!has_transforms[entity_index]) {
@@ -141,18 +141,18 @@ get_transform_matrices(const entity::EntityId id, glm::mat4x4 &world, glm::mat4x
 
 void
 get_updated_transform_component_flags(const entity::EntityId *const ids, u32 count, u8 *const flags) {
-    FASSERT(ids && count && flags, "One of params (or all of them) are invalid or wrong.");
+    FASSERT_MSG(ids && count && flags, "One of params (or all of them) are invalid or wrong.");
     read_write_flag = 1; // mark that we read data
 
     for (u32 i = 0; i < count; ++i) {
-        FASSERT(entity::Entity{ ids[i] }.is_valid(), "Read Entity with id {} is not valid.", id::index(ids[i]));
+        FASSERT_MSG(entity::Entity{ ids[i] }.is_valid(), "Read Entity with id {} is not valid.", id::index(ids[i]));
         flags[i] = changes_from_previous_frame[id::index(ids[i])];
     }
 }
 
 void
 update_tranform_component(const TransformComponentCache *const cache, u32 count) {
-    FASSERT(cache && count, "Invalid params for update_transform_component()");
+    FASSERT_MSG(cache && count, "Invalid params for update_transform_component()");
     // NOTE: clearing changes_from_previous_frame happens once every frame when there will be no reads
     //       and the caches are about to be applied by calling this function (i.e. the rest of the current frame will only have writes).
     if (read_write_flag) {
@@ -163,7 +163,7 @@ update_tranform_component(const TransformComponentCache *const cache, u32 count)
 
     for (u32 i{ 0 }; i < count; ++i) {
         const TransformComponentCache &c{ cache[i] };
-        FASSERT(TransformComponent{ c.id }.is_valid(), "Invalid cache during update_transform_component()");
+        FASSERT_MSG(TransformComponent{ c.id }.is_valid(), "Invalid cache during update_transform_component()");
 
         if (c.flags & TransformComponentFlags::ROTATION) set_rotation(c.id, c.rotation);
         if (c.flags & TransformComponentFlags::ORIENTATION) set_orientation(c.id, c.orientation);
@@ -174,23 +174,23 @@ update_tranform_component(const TransformComponentCache *const cache, u32 count)
 
 glm::quat
 TransformComponent::get_rotation() const {
-    FASSERT(is_valid(), "TransformId not valid for requested entity.:", (u32)get_id());
+    FASSERT_MSG(is_valid(), "TransformId not valid for requested entity.:", (u32)get_id());
     return rotations[id::index(mId)];
 }
 
 glm::vec3
 TransformComponent::get_orientation() const {
-    FASSERT(is_valid(), "TransformId not valid for requested entity.:", (u32)get_id());
+    FASSERT_MSG(is_valid(), "TransformId not valid for requested entity.:", (u32)get_id());
     return orientations[id::index(mId)];
 }
 glm::vec3
 TransformComponent::get_position() const {
-    FASSERT(is_valid(), "TransformId not valid for requested entity.:", (u32)get_id());
+    FASSERT_MSG(is_valid(), "TransformId not valid for requested entity.:", (u32)get_id());
     return positions[id::index(mId)];
 }
 glm::vec3
 TransformComponent::get_scale() const {
-    FASSERT(is_valid(), "TransformId not valid for requested entity.:", (u32)get_id());
+    FASSERT_MSG(is_valid(), "TransformId not valid for requested entity.:", (u32)get_id());
     return scales[id::index(mId)];
 }
 

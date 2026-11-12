@@ -1,4 +1,5 @@
 #include "application.h"
+#include "components/script_component.h"
 #include <format>
 
 namespace ff {
@@ -302,6 +303,8 @@ Application::update(f32 dt) {
         process_sdl_events(event);
     }
     handle_input();
+
+    components::update_script_component(dt);    
 }
 
 void
@@ -349,7 +352,7 @@ Application::run() {
     }
     while (is_running) {
         timer.begin();
-        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
         update(timer.dt());
         render();
 

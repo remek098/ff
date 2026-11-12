@@ -16,20 +16,20 @@
 #endif
 
 #ifndef DISABLE_COPY
-#define DISABLE_COPY(T)                                                                            \
-    explicit T(const T &)   = delete;                                                              \
+#define DISABLE_COPY(T)                                                                                                \
+    explicit T(const T &)   = delete;                                                                                  \
     T &operator=(const T &) = delete;
 #endif // !DISABLE_COPY
 
 #ifndef DISABLE_MOVE
-#define DISABLE_MOVE(T)                                                                            \
-    explicit T(T &&)   = delete;                                                                   \
+#define DISABLE_MOVE(T)                                                                                                \
+    explicit T(T &&)   = delete;                                                                                       \
     T &operator=(T &&) = delete;
 #endif // !DISABLE_COPY
 
 #ifndef DISABLE_COPY_AND_MOVE
-#define DISABLE_COPY_AND_MOVE(T)                                                                   \
-    DISABLE_COPY(T)                                                                                \
+#define DISABLE_COPY_AND_MOVE(T)                                                                                       \
+    DISABLE_COPY(T)                                                                                                    \
     DISABLE_MOVE(T)
 #endif // !DISABLE_COPY_AND_MOVE
 
@@ -48,21 +48,32 @@
 #define FDEBUGBREAK() std::abort()
 #endif
 
-#ifndef FASSERT
+#ifndef FASSERT_MSG
 #if FF_IS_DEBUG
-#define FASSERT(condition, ...)                                                                    \
-    do {                                                                                           \
-        if (!(condition)) {                                                                        \
-            FERROR("Assertion failed: {0}", #condition);                                           \
-            if constexpr (sizeof("" __VA_ARGS__) > 1) {                                            \
-                FERROR(__VA_ARGS__);                                                               \
-            }                                                                                      \
-            FDEBUGBREAK();                                                                         \
-        }                                                                                          \
+#define FASSERT_MSG(condition, ...)                                                                                    \
+    do {                                                                                                               \
+        if (!(condition)) {                                                                                            \
+            FERROR("Assertion failed: {0}", #condition);                                                               \
+            if constexpr (sizeof("" __VA_ARGS__) > 1) {                                                                \
+                FERROR(__VA_ARGS__);                                                                                   \
+            }                                                                                                          \
+            FDEBUGBREAK();                                                                                             \
+        }                                                                                                              \
     } while (0)
+
+#define FASSERT(condition) FASSERT_MSG(condition, "")
+
+// #define FASSERT(condition)                                                                                             \
+//     do {                                                                                                               \
+//         if (!(condition)) {                                                                                            \
+//             FERROR("Assertion failed: {0}", #condition);                                                               \
+//             FDEBUGBREAK();                                                                                             \
+//         }                                                                                                              \
+//     } while (0)
 #else
-#define FASSERT(condition, ...) ((void)0)
+#define FASSERT_MSG(condition, ...) ((void)0)
+#define FASSERT(condition)          ((void)0)
 #endif // !FF_IS_DEBUG
-#endif // !FASSERT
+#endif // !FASSERT_MSG
 
 #include "id.h"
