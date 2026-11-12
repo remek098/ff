@@ -175,7 +175,7 @@ create_script_component(const ScriptComponentInitInfo &info, entity::Entity entt
     script_entities.emplace_back(info.script_creator(entt));
     FASSERT(script_entities.back()->get_id() == entt.get_id()); // should always be true
     id_mapping[id::index(id)] = index;
-    FDEBUG("Script created for entity with id: ", (u32)id);
+    FDEBUG("Script created for entity with id: {}", (u32)id);
     return ScriptComponent{ id };
 }
 

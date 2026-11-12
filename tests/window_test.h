@@ -13,16 +13,16 @@ using namespace ff::entity;
 class beep_script;
 REGISTER_SCRIPT(beep_script);
 class beep_script : public script::ScriptEntity {
-public:
-    constexpr explicit beep_script(Entity entity)
-        : script::ScriptEntity(entity) {}
+  public:
+    constexpr explicit beep_script(Entity entity) : script::ScriptEntity(entity) {}
 
     virtual void begin_play() {}
     virtual void update(f32 dt) {
-        static u32 i = 300;
-        if ( (i++ % 100) == 0 ) Beep(i, 100);
+        if ((i++ % 100) == 0) Beep(i, 100);
     }
-private:
+
+  private:
+    u32 i = 300;
 };
 
 class TestGame : public ff::Application {
@@ -44,32 +44,45 @@ class TestGame : public ff::Application {
 
         register_key_binding("Player.NukeScript", {}, input::KeyboardKeys::Value::N, [this]() {
             FINFO("Pressed key to nuke entity!");
-            if(id::is_valid(_id) && entity::is_alive(_id)) remove_entity(_id);
+            if (entt.is_valid() && entity::is_alive(entt.get_id())) remove_entity(entt.get_id());
         });
 
-        register_mouse_binding(
-            "Player.Shoot",
-            {}, // Optional modifier: Shift + Left Click
-            input::MouseButton::Value::Left,
-            [this]() {
-                FINFO("Player clicked Left Mouse Button at ({}, {})",
-                      FInputManager.get_mouse_x(get_window_id()), // Or query coordinates globally
-                      FInputManager.get_mouse_y(get_window_id()));
-            });
+        register_key_binding("Player.RecreateScript", {}, input::KeyboardKeys::Value::B, [this]() {
+            FINFO("Pressed key to recreate entity!");
+            if (!entity::is_alive(entt.get_id())) {
+                components::TransformComponentInitInfo transform_info{};
+                components::ScriptComponentInitInfo    script_info;
+                script_info.script_creator = script::get_script_creator(script::StringHash()("beep_script"));
+                EntityInfo info{};
+                info.transform = &transform_info;
+                info.script    = &script_info;
+                entt           = create_entity(info);
+            }
+        });
+
+        register_mouse_binding("Player.Shoot",
+                               {}, // Optional modifier: Shift + Left Click
+                               input::MouseButton::Value::Left,
+                               [this]() {
+                                   FINFO("Player clicked Left Mouse Button at ({}, {})",
+                                         FInputManager.get_mouse_x(get_window_id()), // Or query coordinates globally
+                                         FInputManager.get_mouse_y(get_window_id()));
+                               });
 
         components::TransformComponentInitInfo transform_info{};
-        components::ScriptComponentInitInfo script_info;
+        components::ScriptComponentInitInfo    script_info;
         script_info.script_creator = script::get_script_creator(script::StringHash()("beep_script"));
         EntityInfo info{};
         info.transform = &transform_info;
-        info.script = &script_info;
-        _id =  create_entity(info).get_id();
-        
+        info.script    = &script_info;
+        entt           = create_entity(info);
+
         return true;
     }
 
     void shutdown() override {
-        if(id::is_valid(_id) && entity::is_alive(_id)) remove_entity(_id);
+        if (entt.is_valid() && entity::is_alive(entt.get_id())) remove_entity(entt.get_id());
+
         Application::shutdown();
     }
 
@@ -80,6 +93,6 @@ class TestGame : public ff::Application {
         // Put your game-specific per-frame logic here
     }
 
-    private:
-        entity::EntityId _id;
+  private:
+    entity::Entity entt;
 };
