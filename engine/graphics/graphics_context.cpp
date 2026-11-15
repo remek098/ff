@@ -34,16 +34,13 @@ vulkan_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverit
         FINFO("[{}] {}", type_str, pCallbackData->pMessage);
     }
 
-
     // Always return VK_FALSE. Returning VK_TRUE skips the driver action that triggered the layer
     // message.
     return VK_FALSE;
 }
 
 bool
-GraphicsContext::init_instance(const char        *app_name,
-                               uint32_t           ext_count,
-                               const char *const *extensions) {
+GraphicsContext::init_instance(const char *app_name, uint32_t ext_count, const char *const *extensions) {
     vkb::InstanceBuilder instance_builder(vkGetInstanceProcAddr);
     auto                 instance_ret = instance_builder.set_app_name(app_name)
                                             .require_api_version(1, 3, 0)
@@ -67,21 +64,63 @@ GraphicsContext::init_instance(const char        *app_name,
 
 bool
 GraphicsContext::init_device(VkSurfaceKHR surface) {
-    vkb::PhysicalDeviceSelector selector{vkb_instance};
-    auto phys_device_ret = selector.set_surface(surface).set_minimum_version(1, 3).select();
+    // vulkan 1.3 features
+    VkPhysicalDeviceVulkan13Features features{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES };
+    features.dynamicRendering = true;
+    features.synchronization2 = true;
 
-    if (!phys_device_ret)
+    // vulkan 1.2 features
+    VkPhysicalDeviceVulkan12Features features12{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
+    features12.bufferDeviceAddress = true;
+    features12.descriptorIndexing  = true;
+
+    vkb::PhysicalDeviceSelector selector{ vkb_instance };
+    auto                        phys_device_ret = selector.set_surface(surface)
+                                                      .set_minimum_version(1, 3)
+                                                      .set_required_features_13(features)
+                                                      .set_required_features_12(features12)
+                                                      .select();
+
+    if (!phys_device_ret) {
+        FERROR("Couldn't find GPU that would support required features.");
         return false;
+    }
 
-    vkb::DeviceBuilder device_builder{phys_device_ret.value()};
+    vkb::DeviceBuilder device_builder{ phys_device_ret.value() };
     auto               device_ret = device_builder.build();
 
-    if (!device_ret)
-        return false;
+    if (!device_ret) return false;
 
     vkb_device = device_ret.value();
 
     FINFO("vulkan device created successfully.");
+    FINFO("[VULKAN] Present queue index: {}", vkb_device.get_queue_index(vkb::QueueType::present).value());
+    FINFO("[VULKAN] Graphics queue index: {}", vkb_device.get_queue_index(vkb::QueueType::graphics).value());
+    FINFO("[VULKAN] Compute queue index: {}", vkb_device.get_queue_index(vkb::QueueType::compute).value());
+    FINFO("[VULKAN] Transfer queue index: {}", vkb_device.get_queue_index(vkb::QueueType::transfer).value());
+
+    graphics_queue = vkb_device.get_queue(vkb::QueueType::graphics).value();
+    present_queue  = vkb_device.get_queue(vkb::QueueType::present).value();
+    return true;
+}
+
+bool
+GraphicsContext::initialize(const char *app_name, u32 ext_count, const char *const *extensions, SDL_Window *window) {
+    if (!init_instance(app_name, ext_count, extensions)) {
+        FERROR("Failed to initialize Vulkan Instance!");
+        return false;
+    }
+
+    if (!SDL_Vulkan_CreateSurface(window, vkb_instance.instance, nullptr, &surface)) {
+        FERROR("Failed to create Vulkan surface! SDL Error: {}", SDL_GetError());
+        return false;
+    }
+
+    if (!init_device(surface)) {
+        FERROR("Failed to init graphics::GraphicsContext::vkb_device during Application init!");
+        return false;
+    }
+
     return true;
 }
 

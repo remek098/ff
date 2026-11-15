@@ -35,6 +35,7 @@ class ScriptEntity : public entity::Entity {
     virtual ~ScriptEntity() = default;
     virtual void begin_play() {}
     virtual void update(f32) {}
+    virtual void end_play() {} // called right before removal/shutdown.
 
   protected:
     constexpr explicit ScriptEntity(entity::Entity entity) : entity::Entity{ entity.get_id() } {}

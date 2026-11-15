@@ -20,15 +20,14 @@ class Editor : public ff::Application {
             FINFO("Jump action triggered from game code!");
         });
 
-        register_mouse_binding(
-            "Player.Shoot",
-            {}, // Optional modifier: Shift + Left Click
-            input::MouseButton::Value::Left,
-            [this]() {
-                FINFO("Player clicked Left Mouse Button at ({}, {})",
-                      FInputManager.get_mouse_x(get_window_id()), // Or query coordinates globally
-                      FInputManager.get_mouse_y(get_window_id()));
-            });
+        register_mouse_binding("Player.Shoot",
+                               {}, // Optional modifier: Shift + Left Click
+                               input::MouseButton::Value::Left,
+                               [this]() {
+                                   FINFO("Player clicked Left Mouse Button at ({}, {})",
+                                         FInputManager.get_mouse_x(get_window_id()), // Or query coordinates globally
+                                         FInputManager.get_mouse_y(get_window_id()));
+                               });
 
         return true;
     }

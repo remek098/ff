@@ -13,6 +13,9 @@ std::vector<id::Id>              id_mapping;
 std::vector<id::generation_t>    generations;
 std::deque<components::ScriptId> free_ids;
 
+// Queue of script IDs awaiting their begin_play() call
+std::vector<components::ScriptId> pending_begin_play;
+
 // so that we can track all changed to entities that have their transform changed (changed are cached and then at proper
 // time in a frame applied) those hold changes that happen in the game scripts.
 std::vector<components::TransformComponentCache> transform_cache;
@@ -119,28 +122,28 @@ add_script_name(const char *name) {
 
 void
 ScriptEntity::set_rotation(const entity::Entity *const entity, glm::quat rotation_quaternion) {
-    components::TransformComponentCache& cache{*get_transform_component_cache_ptr(entity)};
+    components::TransformComponentCache &cache{ *get_transform_component_cache_ptr(entity) };
     cache.flags |= components::TransformComponentFlags::ROTATION;
     cache.rotation = rotation_quaternion;
 }
 
 void
 ScriptEntity::set_orientation(const entity::Entity *const entity, glm::vec3 orientation_vector) {
-    components::TransformComponentCache& cache{*get_transform_component_cache_ptr(entity)};
+    components::TransformComponentCache &cache{ *get_transform_component_cache_ptr(entity) };
     cache.flags |= components::TransformComponentFlags::ORIENTATION;
     cache.rotation = orientation_vector;
 }
 
 void
 ScriptEntity::set_position(const entity::Entity *const entity, glm::vec3 position) {
-    components::TransformComponentCache& cache{*get_transform_component_cache_ptr(entity)};
+    components::TransformComponentCache &cache{ *get_transform_component_cache_ptr(entity) };
     cache.flags |= components::TransformComponentFlags::POSITION;
     cache.rotation = position;
 }
 
 void
 ScriptEntity::set_scale(const entity::Entity *const entity, glm::vec3 scale) {
-    components::TransformComponentCache& cache{*get_transform_component_cache_ptr(entity)};
+    components::TransformComponentCache &cache{ *get_transform_component_cache_ptr(entity) };
     cache.flags |= components::TransformComponentFlags::SCALE;
     cache.rotation = scale;
 }
@@ -175,6 +178,9 @@ create_script_component(const ScriptComponentInitInfo &info, entity::Entity entt
     script_entities.emplace_back(info.script_creator(entt));
     FASSERT(script_entities.back()->get_id() == entt.get_id()); // should always be true
     id_mapping[id::index(id)] = index;
+
+    pending_begin_play.push_back(id); // so that begin_play() runs before first update().
+
     FDEBUG("Script created for entity with id: {}", (u32)id);
     return ScriptComponent{ id };
 }
@@ -184,6 +190,11 @@ remove_script_component(ScriptComponent component) {
     FASSERT(component.is_valid() && script_exists(component.get_id()));
     const ScriptId id{ component.get_id() };
     const id::Id   index{ id_mapping[id::index(id)] };
+
+    if (script_entities[index]) {
+        script_entities[index]->end_play();
+    }
+
     // get id of last script.
     const ScriptId last_id{ script_entities.back()->get_script().get_id() };
     utils::erase_unordered(script_entities, index);
@@ -193,6 +204,19 @@ remove_script_component(ScriptComponent component) {
 
 void
 update_script_component(f32 dt) {
+    // 1. Process begin_play() for all newly spawned scripts
+    if (!pending_begin_play.empty()) {
+        // Swap out the vector to safely handle scripts that spawn other scripts in begin_play
+        std::vector<components::ScriptId> to_init;
+        to_init.swap(pending_begin_play);
+        for (const auto &id : to_init) {
+            if (script_exists(id)) {
+                const id::Id index{ id_mapping[id::index(id)] };
+                script_entities[index]->begin_play();
+            }
+        }
+    }
+
     for (auto &ptr : script_entities) {
         ptr->update(dt);
     }
@@ -207,6 +231,19 @@ update_script_component(f32 dt) {
         cache_map.clear();
 #endif
     }
+}
+
+void
+shutdown_script_component_system() {
+    for (auto &ptr : script_entities) {
+        if (ptr) ptr->end_play();
+    }
+    script_entities.clear();
+    pending_begin_play.clear();
+    id_mapping.clear();
+    generations.clear();
+    free_ids.clear();
+    FDEBUG("All script components cleared.");
 }
 } // namespace components
 

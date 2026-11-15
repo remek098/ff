@@ -5,7 +5,7 @@
 
 namespace ff::utils {
 
-class ftimer {
+class FTimer {
   public:
     using clock      = std::chrono::steady_clock;
     using time_stamp = clock::time_point;

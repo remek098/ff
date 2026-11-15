@@ -2,7 +2,14 @@
 #include "components/script_component.h"
 #include <format>
 
+// #if BUILD_WITH_EDITOR
+// #include "imgui.h"
+// #include "imgui_impl_sdl3.h"
+// #include "imgui_impl_vulkan.h"
+// #endif
+
 namespace ff {
+VkDescriptorPool imgui_pool;
 
 namespace {
 void
@@ -85,41 +92,67 @@ Application::init(const char *name, u32 width, u32 height) {
         SDL_Quit();
         return false;
     }
-    // else {
-    //     printf("\n=== SDL VULKAN INITIALIZED SUCCESSFULLY ===\n");
-    //     printf("Vulkan extensions required by SDL (%d):\n", extensionCount);
-    //     for (Uint32 i = 0; i < extensionCount; i++) {
-    //         printf("%s\n", extensions[i]);
-    //     }
-    //     printf("====================================\n\n");
-    // }
-    if (!context.init_instance(name, extensionCount, extensions)) {
-        FERROR("Failed to initialize Vulkan Instance!");
-        return false;
-    }
 
-    if (!SDL_Vulkan_CreateSurface(window, context.vkb_instance.instance, nullptr, &surface)) {
-        FERROR("Failed to create Vulkan surface! SDL Error: {}", SDL_GetError());
-        return false;
-    }
-
-    if (!context.init_device(surface)) {
-        FERROR("Failed to init graphics::GraphicsContext::vkb_device during Application init!");
+    if (!gcontext.initialize(name, extensionCount, extensions, window)) {
+        FINFO("Couldn't initialize graphics::GraphicsContext for main application.");
         return false;
     }
 
     VkExtent2D extent = get_window_extent();
-    swapchain.create(context, surface, extent.width, extent.height);
+    gcontext.swapchain.create(gcontext, gcontext.surface, extent.width, extent.height);
 
     FInputManager.register_window(window);
     // SDL_ShowWindow(window);
     // SDL_RaiseWindow(window);
 
     FINFO("initialized SDL window successfully.");
-    is_running = true;
+    is_running      = true;
+    is_game_running = true;
+    game_thread     = std::jthread([this]() { game_thread_proc(); });
+    FINFO("Game thread started.");
     FINFO("Application initialized successfully.");
 
     register_default_input_bindings();
+
+    // IMGUI_CHECKVERSION();
+    // ImGui::CreateContext();
+    // ImGuiIO &io = ImGui::GetIO();
+    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    // io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;   // Enable Docking branch features
+    // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable; // Optional: allows floating windows outside main OS window
+    // ImGui_ImplSDL3_InitForVulkan(window);               // window is your SDL_Window* pointer
+
+    // VkDescriptorPoolSize       pool_sizes[] = { { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 } };
+    // VkDescriptorPoolCreateInfo pool_info    = {};
+    // pool_info.sType                         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    // pool_info.flags                         = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    // pool_info.maxSets                       = 1000;
+    // pool_info.poolSizeCount                 = (uint32_t)IM_ARRAYSIZE(pool_sizes);
+    // pool_info.pPoolSizes                    = pool_sizes;
+
+    // // VkDescriptorPool imgui_pool;
+    // vkCreateDescriptorPool(gcontext.vkb_device.device, &pool_info, nullptr, &imgui_pool);
+
+    // ImGui_ImplVulkan_InitInfo init_info = {};
+    // init_info.Instance                  = gcontext.vkb_instance.instance;
+    // init_info.PhysicalDevice            = gcontext.vkb_device.physical_device;
+    // init_info.Device                    = gcontext.vkb_device.device;
+    // init_info.Queue                     = gcontext.graphics_queue; // Make sure you store your VkQueue handle!
+    // init_info.DescriptorPool            = imgui_pool;
+    // init_info.MinImageCount             = 2;
+    // init_info.ImageCount                = 2;
+    // // init_info.MSAASamples               = VK_SAMPLE_COUNT_1_BIT;
+
+    // VkFormat format = VK_FORMAT_B8G8R8A8_SRGB;
+    // // REQUIRED because you enabled dynamic rendering:
+    // init_info.UseDynamicRendering                          = true;
+    // init_info.PipelineInfoMain.PipelineRenderingCreateInfo = { .sType =
+    //                                                                VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
+    // init_info.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+    // init_info.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats =
+    //     &format; // e.g., VK_FORMAT_B8G8R8A8_SRGB
+
+    // ImGui_ImplVulkan_Init(&init_info);
 
     return true;
 }
@@ -217,19 +250,23 @@ Application::handle_input() {
     for (const auto &callback : callbacks_to_run) {
         callback();
     }
+}
 
-    // Example: Checking mouse button clicks
-    // if (FInputManager.is_mouse_button_pressed(window_id, input::MouseButton::Left)) {
-    //     FINFO("Left mouse clicked at coordinates: ({}, {})",
-    //           FInputManager.get_mouse_x(window_id),
-    //           FInputManager.get_mouse_y(window_id));
-    // }
+void
+Application::game_thread_proc() {
+    utils::FTimer game_timer;
+    while (is_game_running.load(std::memory_order_relaxed)) {
+        game_timer.begin();
+        f32 dt = std::min(game_timer.dt(), 0.1f);
 
-    // if (FInputManager.is_mouse_button_pressed(window_id, input::MouseButton::Right)) {
-    //     FINFO("Right mouse clicked at coordinates: ({}, {})",
-    //           FInputManager.get_mouse_x(window_id),
-    //           FInputManager.get_mouse_y(window_id));
-    // }
+        components::update_script_component(dt);
+        // Target tick rate (e.g., ~100Hz / 10ms)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        if (game_timer.end()) {
+            game_dt.store(game_timer.dt_avg(), std::memory_order_relaxed);
+            game_fps.store(game_timer.fps_avg(), std::memory_order_relaxed);
+        }
+    }
 }
 
 void
@@ -247,9 +284,8 @@ Application::handle_resize() {
     window_width  = extent.width;
     window_height = extent.height;
 
-    // Recreate the swapchain safely
-    vkDeviceWaitIdle(context.vkb_device.device);
-    swapchain.recreate(context, surface, extent.width, extent.height);
+    vkDeviceWaitIdle(gcontext.vkb_device.device);
+    gcontext.swapchain.recreate(gcontext, gcontext.surface, extent.width, extent.height);
     swapchain_resize_requested = false;
 
     FINFO("Resize handled.");
@@ -300,11 +336,12 @@ Application::update(f32 dt) {
 
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+        // ImGui_ImplSDL3_ProcessEvent(&event);
         process_sdl_events(event);
     }
     handle_input();
 
-    components::update_script_component(dt);    
+    // components::update_script_component(dt);
 }
 
 void
@@ -320,19 +357,54 @@ Application::render() {
     }
 
     if (is_minimized) return;
+    // // 1. Start the frame
+    // ImGui_ImplVulkan_NewFrame();
+    // ImGui_ImplSDL3_NewFrame();
+    // ImGui::NewFrame();
+
+    // // 2. Build your DockSpace UI layout
+    // ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+    // ImGui::ShowDemoWindow(); // Example window
+
+    // // 3. Render ImGui internal command structures
+    // ImGui::Render();
+    // ImDrawData *draw_data = ImGui::GetDrawData();
+
+    // // 4. Record into your Vulkan command buffer (inside your render pass / dynamic rendering block)
+    // // vkCmdBeginRenderPass(...) or vkCmdBeginRendering(...)
+    // // ImGui_ImplVulkan_RenderDrawData(draw_data, command_buffer);
+    // // vkCmdEndRenderPass(...) or vkCmdEndRendering(...)
+
+    // // 5. Handle multi-viewports if enabled (renders floating editor windows)
+    // ImGuiIO& io = ImGui::GetIO();
+    // if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+    //     ImGui::UpdatePlatformWindows();
+    //     ImGui::RenderPlatformWindowsDefault();
+    // }
 }
 
 void
 Application::shutdown() {
-    vkDeviceWaitIdle(context.vkb_device.device);
+    is_game_running.store(false);
+    if (game_thread.joinable()) {
+        game_thread.join();
+    }
+
+    vkDeviceWaitIdle(gcontext.vkb_device.device);
+    // ImGui_ImplVulkan_Shutdown();
+    // ImGui_ImplSDL3_Shutdown();
+    // ImGui::DestroyContext();
+    // vkDestroyDescriptorPool(gcontext.vkb_device.device, imgui_pool, nullptr);
+
+    components::shutdown_script_component_system();
 
     // Clean up in reverse creation order
-    swapchain.destroy(context);
-    if (surface != VK_NULL_HANDLE) {
-        vkDestroySurfaceKHR(context.vkb_instance.instance, surface, nullptr);
-        surface = VK_NULL_HANDLE;
+    gcontext.swapchain.destroy(gcontext);
+    if (gcontext.surface != VK_NULL_HANDLE) {
+        vkDestroySurfaceKHR(gcontext.vkb_instance.instance, gcontext.surface, nullptr);
+        gcontext.surface = VK_NULL_HANDLE;
     }
-    context.destroy();
+    gcontext.destroy();
 
     FInputManager.unregister_window(window); // SDL_GetWindowFromID(window_id)
     SDL_DestroyWindow(window);
@@ -352,11 +424,16 @@ Application::run() {
     }
     while (is_running) {
         timer.begin();
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
         update(timer.dt());
         render();
 
-        if (timer.end()) set_sdl_window_title_frame_metrics(window, application_name, timer.dt_avg(), timer.fps_avg());
+        // if (timer.end()) set_sdl_window_title_frame_metrics(window, application_name, timer.dt_avg(),
+        // timer.fps_avg());
+        if (timer.end()) {
+            set_sdl_window_title_frame_metrics(window, application_name, game_dt.load(), game_fps.load());
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     shutdown();
 }

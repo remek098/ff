@@ -1,8 +1,11 @@
 #pragma once
 
-#include "graphics_context.h"
+#include "VkBootstrap.h"
+#include "common/primitive_types.h"
+// #include "graphics_context.h"
 
 namespace ff::graphics {
+  struct GraphicsContext;
 class Swapchain {
   public:
     Swapchain() = default;

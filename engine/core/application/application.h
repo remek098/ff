@@ -11,6 +11,8 @@
 #include "graphics/swapchain.h"
 #include <string_view>
 #include <vector>
+#include <thread>
+#include <atomic>
 
 namespace ff {
 
@@ -70,6 +72,7 @@ class Application {
     void on_quit_triggered();
 
   private:
+    void       game_thread_proc();
     void       handle_resize();
     VkExtent2D get_window_extent() const;
 
@@ -85,14 +88,20 @@ class Application {
     bool        swapchain_resize_requested{ false };
 
     // owned directly and managed by application
-    graphics::GraphicsContext context{};
-    graphics::Swapchain       swapchain{};
-    VkSurfaceKHR              surface{ VK_NULL_HANDLE };
+    graphics::GraphicsContext gcontext{};
+    // graphics::Swapchain       swapchain{};
+    // VkSurfaceKHR              surface{ VK_NULL_HANDLE };
 
-    std::vector<KeyBinding>   key_bindings;
-    std::vector<Action>       triggered_actions_this_frame;
+    std::vector<KeyBinding> key_bindings;
+    std::vector<Action>     triggered_actions_this_frame;
 
-    private:
-      utils::ftimer timer{};
+  private:
+    utils::FTimer     timer{};
+
+    std::jthread      game_thread;
+    std::atomic<bool> is_game_running{ false };
+    // Thread-safe metrics from the game thread to show in the window title
+    std::atomic<f32> game_dt{ 0.0f };
+    std::atomic<f32> game_fps{ 0.0f };
 };
 } // namespace ff

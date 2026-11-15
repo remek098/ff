@@ -16,9 +16,15 @@ class beep_script : public script::ScriptEntity {
   public:
     constexpr explicit beep_script(Entity entity) : script::ScriptEntity(entity) {}
 
-    virtual void begin_play() {}
+    virtual void begin_play() {
+        FDEBUG("Beep script Begin play.");
+    }
     virtual void update(f32 dt) {
         if ((i++ % 100) == 0) Beep(i, 100);
+    }
+
+    virtual void end_play() {
+        FDEBUG("Beep script End play.");
     }
 
   private:

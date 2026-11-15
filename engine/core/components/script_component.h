@@ -11,4 +11,6 @@ ScriptComponent create_script_component(const ScriptComponentInitInfo &info, ent
 void            remove_script_component(ScriptComponent component);
 void            update_script_component(f32 dt);
 
+void            shutdown_script_component_system();
+
 } // namespace ff::components
