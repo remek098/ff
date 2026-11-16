@@ -37,6 +37,30 @@ class ScriptEntity : public entity::Entity {
     virtual void update(f32) {}
     virtual void end_play() {} // called right before removal/shutdown.
 
+    virtual void tick(f32 dt) {}
+
+    // Set how often tick() should be called (in seconds).
+    // e.g., 1.0f = once per second, 0.0f = every frame.
+    void set_tick_interval(f32 interval) { tick_interval = interval; }
+    f32  get_tick_interval() const { return tick_interval; }
+
+    // Internal helper called by the engine each frame
+    void internal_update(f32 dt) {
+        update(dt); // Runs every frame (if you still need per-frame logic)
+
+        if (tick_interval > 0.0f) {
+            tick_accumulator += dt;
+            while (tick_accumulator >= tick_interval) {
+                tick(tick_interval); // Pass the fixed tick duration or dt
+                tick_accumulator -= tick_interval;
+            }
+        }
+    }
+
+  private:
+    f32 tick_interval    = 0.0f; // 0 means disabled / default behavior
+    f32 tick_accumulator = 0.0f;
+
   protected:
     constexpr explicit ScriptEntity(entity::Entity entity) : entity::Entity{ entity.get_id() } {}
 

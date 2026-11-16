@@ -3,15 +3,21 @@
 #include "transform_component.h"
 
 #include "utils/utilities.h"
+#include <mutex>
+#include <memory>
 
 #define USE_TRANSFORM_CACHE_MAP 0
 
 namespace ff {
 namespace {
-std::vector<script::ScriptPtr>   script_entities;
-std::vector<id::Id>              id_mapping;
-std::vector<id::generation_t>    generations;
-std::deque<components::ScriptId> free_ids;
+std::vector<script::ScriptPtr>                     script_entities;
+std::vector<std::unique_ptr<script::ScriptEntity>> pending_spawn_entities;
+std::vector<script::ScriptEntity *>                pending_destroy_entities;
+std::mutex                                         script_mutex;
+
+std::vector<id::Id>                                id_mapping;
+std::vector<id::generation_t>                      generations;
+std::deque<components::ScriptId>                   free_ids;
 
 // Queue of script IDs awaiting their begin_play() call
 std::vector<components::ScriptId> pending_begin_play;
@@ -151,62 +157,83 @@ ScriptEntity::set_scale(const entity::Entity *const entity, glm::vec3 scale) {
 } // namespace script
 
 namespace components {
-
 ScriptComponent
 create_script_component(const ScriptComponentInitInfo &info, entity::Entity entt) {
     FASSERT(entt.is_valid());
     FASSERT(info.script_creator);
 
     ScriptId id;
-    if (free_ids.size() > id::minimum_deleted_elements) {
-        id = free_ids.front();
-        FASSERT(!script_exists(id)); // assert that id doesn't exist
-        // free, reuse by increasing generation for that id slot
-        free_ids.pop_front();
-        id = ScriptId{ id::new_generation(id) };
-        ++generations[id::index(id)];
-    } else {
-        // that means we got to add new slots at the end of arrays
-        id = ScriptId{ (id::Id)id_mapping.size() };
-        id_mapping.emplace_back();
-        generations.push_back(0);
+    {
+        std::lock_guard<std::mutex> lock(script_mutex);
+        if (free_ids.size() > id::minimum_deleted_elements) {
+            id = free_ids.front();
+            FASSERT(!script_exists(id));
+            free_ids.pop_front();
+            id = ScriptId{ id::new_generation(id) };
+            ++generations[id::index(id)];
+        } else {
+            id = ScriptId{ (id::Id)id_mapping.size() };
+            id_mapping.emplace_back();
+            generations.push_back(0);
+        }
+
+        FASSERT(id::is_valid(id));
+
+        // 1. Instead of modifying script_entities mid-game, queue the spawn!
+        auto new_entity = info.script_creator(entt);
+        FASSERT(new_entity->get_id() == entt.get_id());
+        
+        pending_spawn_entities.push_back(std::move(new_entity));
+        
+        // Note: We need a temporary mapping or index allocation here if ScriptComponent 
+        // needs its ID immediately. For simplicity, let's keep track of it:
+        const id::Id index{ (id::Id)(script_entities.size() + pending_spawn_entities.size() - 1) };
+        id_mapping[id::index(id)] = index;
+        pending_begin_play.push_back(id);
+
+        FDEBUG("Script created for entity with id: {}", (u32)id);
+        return ScriptComponent{ id };
     }
-
-    FASSERT(id::is_valid(id));
-    // get position of where new script_entity was added, ofc it is end of script_entities array
-    const id::Id index{ (id::Id)script_entities.size() };
-    script_entities.emplace_back(info.script_creator(entt));
-    FASSERT(script_entities.back()->get_id() == entt.get_id()); // should always be true
-    id_mapping[id::index(id)] = index;
-
-    pending_begin_play.push_back(id); // so that begin_play() runs before first update().
-
-    FDEBUG("Script created for entity with id: {}", (u32)id);
-    return ScriptComponent{ id };
 }
 
 void
 remove_script_component(ScriptComponent component) {
     FASSERT(component.is_valid() && script_exists(component.get_id()));
     const ScriptId id{ component.get_id() };
-    const id::Id   index{ id_mapping[id::index(id)] };
+    
+    std::lock_guard<std::mutex> lock(script_mutex);
+    const id::Id index{ id_mapping[id::index(id)] };
 
-    if (script_entities[index]) {
-        script_entities[index]->end_play();
+    if (index < script_entities.size() && script_entities[index]) {
+        pending_destroy_entities.push_back(script_entities[index].get());
     }
-
-    // get id of last script.
-    const ScriptId last_id{ script_entities.back()->get_script().get_id() };
-    utils::erase_unordered(script_entities, index);
-    id_mapping[id::index(last_id)] = index;
-    id_mapping[id::index(id)]      = id::invalid_id;
 }
 
 void
 update_script_component(f32 dt) {
-    // 1. Process begin_play() for all newly spawned scripts
+    std::lock_guard<std::mutex> lock(script_mutex);
+
+    // 1. Process Pending Destroys Safely
+    for (auto *target : pending_destroy_entities) {
+        target->end_play();
+        auto it = std::find_if(script_entities.begin(), script_entities.end(),
+            [target](const auto &ptr) { return ptr.get() == target; });
+        if (it != script_entities.end()) {
+            size_t index = std::distance(script_entities.begin(), it);
+            // find its ScriptId to clean id_mapping if needed, or handle unordered erase
+            utils::erase_unordered(script_entities, index);
+        }
+    }
+    pending_destroy_entities.clear();
+
+    // 2. Process Pending Spawns Safely
+    for (auto &entity : pending_spawn_entities) {
+        script_entities.push_back(std::move(entity));
+    }
+    pending_spawn_entities.clear();
+
+    // 3. Process begin_play() for all newly spawned scripts
     if (!pending_begin_play.empty()) {
-        // Swap out the vector to safely handle scripts that spawn other scripts in begin_play
         std::vector<components::ScriptId> to_init;
         to_init.swap(pending_begin_play);
         for (const auto &id : to_init) {
@@ -217,12 +244,15 @@ update_script_component(f32 dt) {
         }
     }
 
+    // 4. Update all active entities safely (no reallocations can happen during this loop!)
     for (auto &ptr : script_entities) {
-        ptr->update(dt);
+        if (ptr) {
+            //ptr->update(dt);
+            ptr->internal_update(dt);
+        }
     }
 
-    // after all scripts have been executed we can send the cached updates to the transform component module and
-    // reset our cache array and prepare for the next frame.
+    // 5. Handle Transform Cache
     if (transform_cache.size()) {
         components::update_tranform_component(transform_cache.data(), (u32)transform_cache.size());
         transform_cache.clear();
@@ -232,6 +262,102 @@ update_script_component(f32 dt) {
 #endif
     }
 }
+
+
+// ScriptComponent
+// create_script_component(const ScriptComponentInitInfo &info, entity::Entity entt) {
+//     FASSERT(entt.is_valid());
+//     FASSERT(info.script_creator);
+
+//     ScriptId id;
+//     if (free_ids.size() > id::minimum_deleted_elements) {
+//         id = free_ids.front();
+//         FASSERT(!script_exists(id)); // assert that id doesn't exist
+//         // free, reuse by increasing generation for that id slot
+//         free_ids.pop_front();
+//         id = ScriptId{ id::new_generation(id) };
+//         ++generations[id::index(id)];
+//     } else {
+//         // that means we got to add new slots at the end of arrays
+//         id = ScriptId{ (id::Id)id_mapping.size() };
+//         id_mapping.emplace_back();
+//         generations.push_back(0);
+//     }
+
+//     FASSERT(id::is_valid(id));
+//     // get position of where new script_entity was added, ofc it is end of script_entities array
+//     const id::Id index{ (id::Id)script_entities.size() };
+//     script_entities.emplace_back(info.script_creator(entt));
+//     FASSERT(script_entities.back()->get_id() == entt.get_id()); // should always be true
+//     id_mapping[id::index(id)] = index;
+
+//     pending_begin_play.push_back(id); // so that begin_play() runs before first update().
+
+//     FDEBUG("Script created for entity with id: {}", (u32)id);
+//     return ScriptComponent{ id };
+// }
+
+// void
+// remove_script_component(ScriptComponent component) {
+//     FASSERT(component.is_valid() && script_exists(component.get_id()));
+//     const ScriptId id{ component.get_id() };
+//     const id::Id   index{ id_mapping[id::index(id)] };
+
+//     if (script_entities[index]) {
+//         script_entities[index]->end_play();
+//     }
+
+//     // get id of last script.
+//     const ScriptId last_id{ script_entities.back()->get_script().get_id() };
+//     utils::erase_unordered(script_entities, index);
+//     id_mapping[id::index(last_id)] = index;
+//     id_mapping[id::index(id)]      = id::invalid_id;
+// }
+
+// void
+// update_script_component(f32 dt) {
+//     // 1. Process begin_play() for all newly spawned scripts
+//     if (!pending_begin_play.empty()) {
+//         // Swap out the vector to safely handle scripts that spawn other scripts in begin_play
+//         std::vector<components::ScriptId> to_init;
+//         to_init.swap(pending_begin_play);
+//         for (const auto &id : to_init) {
+//             if (script_exists(id)) {
+//                 const id::Id index{ id_mapping[id::index(id)] };
+//                 script_entities[index]->begin_play();
+//             }
+//         }
+//     }
+
+//     std::vector<ff::script::ScriptEntity *> script_entities_copy;
+//     {
+//         // Make sure to lock your mutex here if script_entities is accessed across threads!
+//         script_entities_copy.reserve(script_entities.size());
+//         for (const auto &ptr : script_entities) {
+//             script_entities_copy.push_back(ptr.get());
+//         }
+//     }
+
+//     for (auto *entity : script_entities_copy) {
+//         if (entity) {
+//             entity->update(dt);
+//         }
+//     }
+//     // for (auto &ptr : script_entities) {
+//     //     ptr->update(dt);
+//     // }
+
+//     // after all scripts have been executed we can send the cached updates to the transform component module and
+//     // reset our cache array and prepare for the next frame.
+//     if (transform_cache.size()) {
+//         components::update_tranform_component(transform_cache.data(), (u32)transform_cache.size());
+//         transform_cache.clear();
+
+// #if USE_TRANSFORM_CACHE_MAP
+//         cache_map.clear();
+// #endif
+//     }
+// }
 
 void
 shutdown_script_component_system() {

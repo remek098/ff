@@ -4,7 +4,7 @@ namespace ff::input {
 
 void
 InputManager::register_window(SDL_Window *window) {
-    SDL_WindowID id = SDL_GetWindowID(window);
+    SDL_WindowID id     = SDL_GetWindowID(window);
     m_window_states[id] = InputSystemState{};
 }
 
@@ -18,9 +18,9 @@ void
 InputManager::prepare_for_new_frame() {
     for (auto &[id, state] : m_window_states) {
         state.keyboard.previous = state.keyboard.current;
-        state.mouse.previous = state.mouse.current;
-        state.mouse.scroll_x = 0.0f;
-        state.mouse.scroll_y = 0.0f;
+        state.mouse.previous    = state.mouse.current;
+        state.mouse.scroll_x    = 0.0f;
+        state.mouse.scroll_y    = 0.0f;
     }
 }
 
@@ -169,7 +169,7 @@ InputManager::handle_event(const SDL_Event &event) {
         auto it = m_window_states.find(event.button.windowID);
         if (it != m_window_states.end()) {
             bool is_pressed = (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN);
-            i32 btn = event.button.button - 1; // SDL buttons start at 1
+            i32  btn        = event.button.button - 1; // SDL buttons start at 1
             if (btn >= 0 && btn < MouseButton::COUNT) {
                 it->second.mouse.current[btn] = is_pressed;
             }

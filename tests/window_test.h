@@ -16,14 +16,19 @@ class beep_script : public script::ScriptEntity {
   public:
     constexpr explicit beep_script(Entity entity) : script::ScriptEntity(entity) {}
 
-    virtual void begin_play() {
+    virtual void begin_play() override {
+        set_tick_interval(0.01f);
         FDEBUG("Beep script Begin play.");
     }
-    virtual void update(f32 dt) {
+    virtual void update(f32 dt) override {
+        // if ((i++ % 100) == 0) Beep(i, 100);
+    }
+
+    virtual void tick(f32 dt) override {
         if ((i++ % 100) == 0) Beep(i, 100);
     }
 
-    virtual void end_play() {
+    virtual void end_play() override {
         FDEBUG("Beep script End play.");
     }
 

@@ -1,6 +1,7 @@
 #include "application.h"
 #include "components/script_component.h"
 #include <format>
+#include <algorithm>
 
 // #if BUILD_WITH_EDITOR
 // #include "imgui.h"
@@ -25,22 +26,42 @@ Application::Application(const char *name, u32 width, u32 height)
 }
 
 namespace {
-struct GameKeyBinding {
-    std::string                             name;
-    std::vector<input::KeyboardKeys::Value> required_down;
-    input::KeyboardKeys::Value              pressed_this_frame;
-    std::function<void()>                   on_triggered;
-};
-
-struct GameMouseButtonBinding {
-    std::string                             name;
-    std::vector<input::KeyboardKeys::Value> required_down; // e.g., Hold LSHIFT + Click
-    input::MouseButton::Value               button;        // Left, Right, Middle, etc.
-    std::function<void()>                   on_triggered;
-};
+std::mutex                          bindings_mutex;
 std::vector<GameKeyBinding>         game_key_bindings;
-std::vector<GameMouseButtonBinding> game_mouse_bindings;
+std::vector<GameMouseButtonBinding> game_mouse_button_bindings;
 } // namespace
+
+GameKeyBinding &
+get_game_key_binding(const std::string &name) {
+    std::lock_guard<std::mutex> lock(bindings_mutex);
+    auto it = std::find_if(game_key_bindings.begin(), game_key_bindings.end(), [&name](const GameKeyBinding &binding) {
+        return binding.name == name; // Adjust '.name' to match your struct member
+    });
+
+    if (it == game_key_bindings.end()) {
+        FERROR("GameKeyBinding not found: {}", name);
+        throw std::out_of_range("GameKeyBinding not found: " + name);
+    }
+
+    return *it;
+}
+
+GameMouseButtonBinding &
+get_game_mouse_button_binding(const std::string &name) {
+    std::lock_guard<std::mutex> lock(bindings_mutex);
+    auto                        it = std::find_if(game_mouse_button_bindings.begin(),
+                                                  game_mouse_button_bindings.end(),
+                                                  [&name](const GameMouseButtonBinding &binding) {
+                               return binding.name == name; // Adjust '.name' to match your struct member
+                                                  });
+
+    if (it == game_mouse_button_bindings.end()) {
+        FERROR("GameMouseButtonBinding not found: {}", name);
+        throw std::out_of_range("GameKeyBinding not found: " + name);
+    }
+
+    return *it;
+}
 
 void
 Application::register_key_binding(std::string                             action_name,
@@ -48,6 +69,7 @@ Application::register_key_binding(std::string                             action
                                   input::KeyboardKeys::Value              key,
                                   std::function<void()>                   callback) {
     FINFO("Registering game key binding: '{}'", action_name);
+    std::lock_guard<std::mutex> lock(bindings_mutex);
     game_key_bindings.push_back({ std::move(action_name), std::move(modifiers), key, std::move(callback) });
 }
 
@@ -57,7 +79,8 @@ Application::register_mouse_binding(std::string                             acti
                                     input::MouseButton::Value               button,
                                     std::function<void()>                   callback) {
     FINFO("Registering game mouse binding: '{}'", action_name);
-    game_mouse_bindings.push_back({ std::move(action_name), std::move(modifiers), button, std::move(callback) });
+    std::lock_guard<std::mutex> lock(bindings_mutex);
+    game_mouse_button_bindings.push_back({ std::move(action_name), std::move(modifiers), button, std::move(callback) });
 }
 
 bool
@@ -77,12 +100,12 @@ Application::init(const char *name, u32 width, u32 height) {
         return false;
     }
 
-    if (!SDL_Vulkan_LoadLibrary(NULL)) {
-        FERROR("SDL failed to load vulkan : {}", SDL_GetError());
-        SDL_DestroyWindow(window);
-        SDL_Quit();
-        return false;
-    }
+    // if (!SDL_Vulkan_LoadLibrary(NULL)) {
+    //     FERROR("SDL failed to load vulkan : {}", SDL_GetError());
+    //     SDL_DestroyWindow(window);
+    //     SDL_Quit();
+    //     return false;
+    // }
 
     Uint32             extensionCount = 0;
     const char *const *extensions     = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
@@ -98,8 +121,9 @@ Application::init(const char *name, u32 width, u32 height) {
         return false;
     }
 
-    VkExtent2D extent = get_window_extent();
-    gcontext.swapchain.create(gcontext, gcontext.surface, extent.width, extent.height);
+    VkExtent2D extent         = get_window_extent();
+    gcontext.swapchain.extent = extent;
+    gcontext.swapchain.create(gcontext, extent.width, extent.height);
 
     FInputManager.register_window(window);
     // SDL_ShowWindow(window);
@@ -147,7 +171,8 @@ Application::init(const char *name, u32 width, u32 height) {
     // // REQUIRED because you enabled dynamic rendering:
     // init_info.UseDynamicRendering                          = true;
     // init_info.PipelineInfoMain.PipelineRenderingCreateInfo = { .sType =
-    //                                                                VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
+    //                                                                VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO
+    //                                                                };
     // init_info.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
     // init_info.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats =
     //     &format; // e.g., VK_FORMAT_B8G8R8A8_SRGB
@@ -159,7 +184,7 @@ Application::init(const char *name, u32 width, u32 height) {
 
 void
 Application::register_default_input_bindings() {
-    game_mouse_bindings.clear();
+    game_mouse_button_bindings.clear();
     game_key_bindings.clear();
     key_bindings.clear(); // just in case if we restart application.
     key_bindings.push_back(KeyBinding(Action::Quit,
@@ -189,13 +214,23 @@ Application::on_quit_triggered() {
 void
 Application::handle_input() {
     triggered_actions_this_frame.clear();
-    SDL_WindowID window_id = SDL_GetWindowID(window);
+    SDL_WindowID                        window_id = SDL_GetWindowID(window);
+
+    std::vector<KeyBinding>             local_key_bindings;
+    std::vector<GameKeyBinding>         local_game_key_bindings;
+    std::vector<GameMouseButtonBinding> local_game_mouse_bindings;
+    {
+        std::lock_guard<std::mutex> lock(bindings_mutex);
+        local_key_bindings        = key_bindings;
+        local_game_key_bindings   = game_key_bindings;
+        local_game_mouse_bindings = game_mouse_button_bindings;
+    }
 
     // Store callbacks to run AFTER iteration finishes to prevent iterator invalidation
     std::vector<std::function<void()>> callbacks_to_run;
 
     // 1. handle key_bindings
-    for (const auto &binding : key_bindings) {
+    for (const auto &binding : local_key_bindings) {
         bool modifiers_met = true;
         for (auto mod : binding.required_down) {
             if (!FInputManager.is_key_down(window_id, mod)) {
@@ -213,7 +248,7 @@ Application::handle_input() {
     }
 
     // 2. handle game-specific keybindings
-    for (const auto &binding : game_key_bindings) {
+    for (const auto &binding : local_game_key_bindings) {
         bool modifiers_met = true;
         for (auto mod : binding.required_down) {
             if (!FInputManager.is_key_down(window_id, mod)) {
@@ -230,7 +265,7 @@ Application::handle_input() {
     }
 
     // handle mouse button bindings.
-    for (const auto &binding : game_mouse_bindings) {
+    for (const auto &binding : local_game_mouse_bindings) {
         bool modifiers_met = true;
         for (auto mod : binding.required_down) {
             if (!FInputManager.is_key_down(window_id, mod)) {
@@ -261,7 +296,7 @@ Application::game_thread_proc() {
 
         components::update_script_component(dt);
         // Target tick rate (e.g., ~100Hz / 10ms)
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(5));
         if (game_timer.end()) {
             game_dt.store(game_timer.dt_avg(), std::memory_order_relaxed);
             game_fps.store(game_timer.fps_avg(), std::memory_order_relaxed);
@@ -285,7 +320,7 @@ Application::handle_resize() {
     window_height = extent.height;
 
     vkDeviceWaitIdle(gcontext.vkb_device.device);
-    gcontext.swapchain.recreate(gcontext, gcontext.surface, extent.width, extent.height);
+    gcontext.recreate_swapchain(extent.width, extent.height);
     swapchain_resize_requested = false;
 
     FINFO("Resize handled.");
@@ -346,42 +381,204 @@ Application::update(f32 dt) {
 
 void
 Application::render() {
-    if (swapchain_resize_requested && !is_minimized) {
-        i32 width, height;
-        SDL_GetWindowSizeInPixels(window, &width, &height);
-        if (width > 0 && height > 0) {
-            FDEBUG("TODO: recreate or request renderer to recreate a swapchain. ({}, {})", width, height);
-            // swapchain_resize_requested = false;
-            handle_resize();
-        }
+    if (!begin_frame()) return;
+
+#pragma region
+// // 1. Start the frame
+// ImGui_ImplVulkan_NewFrame();
+// ImGui_ImplSDL3_NewFrame();
+// ImGui::NewFrame();
+
+// // 2. Build your DockSpace UI layout
+// ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+// ImGui::ShowDemoWindow(); // Example window
+
+// // 3. Render ImGui internal command structures
+// ImGui::Render();
+// ImDrawData *draw_data = ImGui::GetDrawData();
+
+// // 4. Record into your Vulkan command buffer (inside your render pass / dynamic rendering block)
+// // vkCmdBeginRenderPass(...) or vkCmdBeginRendering(...)
+// // ImGui_ImplVulkan_RenderDrawData(draw_data, command_buffer);
+// // vkCmdEndRenderPass(...) or vkCmdEndRendering(...)
+
+// // 5. Handle multi-viewports if enabled (renders floating editor windows)
+// ImGuiIO& io = ImGui::GetIO();
+// if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+//     ImGui::UpdatePlatformWindows();
+//     ImGui::RenderPlatformWindowsDefault();
+// }
+#pragma endregion
+
+    VkDevice       device           = gcontext.device;
+    VkSwapchainKHR swapchain_handle = gcontext.swapchain.get_handle();
+    if (swapchain_handle == VK_NULL_HANDLE) {
+        end_frame();
+        return;
     }
 
-    if (is_minimized) return;
-    // // 1. Start the frame
-    // ImGui_ImplVulkan_NewFrame();
-    // ImGui_ImplSDL3_NewFrame();
-    // ImGui::NewFrame();
+    // 1. Create a temporary fence for acquisition
+    VkFenceCreateInfo fence_info{ .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+    VkFence           acquire_fence;
+    if (vkCreateFence(device, &fence_info, nullptr, &acquire_fence) != VK_SUCCESS) {
+        end_frame();
+        return;
+    }
 
-    // // 2. Build your DockSpace UI layout
-    // ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
-    // ImGui::ShowDemoWindow(); // Example window
+    u32      image_index = 0;
+    VkResult result =
+        vkAcquireNextImageKHR(device, swapchain_handle, 1000000000, VK_NULL_HANDLE, acquire_fence, &image_index);
 
-    // // 3. Render ImGui internal command structures
-    // ImGui::Render();
-    // ImDrawData *draw_data = ImGui::GetDrawData();
+    vkWaitForFences(device, 1, &acquire_fence, VK_TRUE, UINT64_MAX);
+    vkDestroyFence(device, acquire_fence, nullptr);
 
-    // // 4. Record into your Vulkan command buffer (inside your render pass / dynamic rendering block)
-    // // vkCmdBeginRenderPass(...) or vkCmdBeginRendering(...)
-    // // ImGui_ImplVulkan_RenderDrawData(draw_data, command_buffer);
-    // // vkCmdEndRenderPass(...) or vkCmdEndRendering(...)
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        swapchain_resize_requested = true;
+        end_frame();
+        return;
+    } else if (result != VK_SUCCESS) {
+        FERROR("Failed to acquire swapchain image! VkResult: {}", static_cast<int>(result));
+        end_frame();
+        return;
+    }
 
-    // // 5. Handle multi-viewports if enabled (renders floating editor windows)
-    // ImGuiIO& io = ImGui::GetIO();
-    // if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-    //     ImGui::UpdatePlatformWindows();
-    //     ImGui::RenderPlatformWindowsDefault();
-    // }
+    VkImage     image      = gcontext.swapchain.get_images()[image_index];
+    VkImageView image_view = gcontext.swapchain.get_image_views()[image_index];
+    VkExtent2D  extent     = gcontext.swapchain.get_extent();
+
+    // 2. Allocate a temporary command buffer to do the clear and layout transition
+    VkCommandPoolCreateInfo pool_info{};
+    pool_info.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    pool_info.flags            = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    pool_info.queueFamilyIndex = gcontext.graphics_family_index;
+
+    VkCommandPool temp_pool;
+    vkCreateCommandPool(device, &pool_info, nullptr, &temp_pool);
+
+    VkCommandBufferAllocateInfo alloc_info{};
+    alloc_info.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    alloc_info.commandPool        = temp_pool;
+    alloc_info.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    alloc_info.commandBufferCount = 1;
+
+    VkCommandBuffer cmd;
+    vkAllocateCommandBuffers(device, &alloc_info, &cmd);
+
+    // 3. Record commands (Transition -> Clear via Dynamic Rendering -> Transition)
+    VkCommandBufferBeginInfo begin_info{};
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(cmd, &begin_info);
+
+    // --- BARRIER 1: UNDEFINED -> COLOR_ATTACHMENT_OPTIMAL ---
+    VkImageMemoryBarrier2 barrier_to_color{ .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2 };
+    barrier_to_color.srcStageMask        = VK_PIPELINE_STAGE_2_NONE;
+    barrier_to_color.srcAccessMask       = 0;
+    barrier_to_color.dstStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    barrier_to_color.dstAccessMask       = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+    barrier_to_color.oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier_to_color.newLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    barrier_to_color.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier_to_color.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier_to_color.image               = image;
+    barrier_to_color.subresourceRange    = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+
+    VkDependencyInfo dep_info_to_color{ .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+    dep_info_to_color.imageMemoryBarrierCount = 1;
+    dep_info_to_color.pImageMemoryBarriers    = &barrier_to_color;
+    vkCmdPipelineBarrier2(cmd, &dep_info_to_color);
+
+    // --- DYNAMIC RENDERING: CLEAR SCREEN ---
+    VkRenderingAttachmentInfo color_attachment{ .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO };
+    color_attachment.imageView   = image_view;
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;    // Clears the screen
+    color_attachment.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;   // Stores it to present
+    color_attachment.clearValue  = { { 0.1f, 0.2f, 0.4f, 1.0f } }; // Blueish clear color
+
+    VkRenderingInfo rendering_info{ .sType = VK_STRUCTURE_TYPE_RENDERING_INFO };
+    rendering_info.renderArea           = { { 0, 0 }, extent };
+    rendering_info.layerCount           = 1;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments    = &color_attachment;
+
+    vkCmdBeginRendering(cmd, &rendering_info);
+    vkCmdEndRendering(cmd);
+
+    // --- BARRIER 2: COLOR_ATTACHMENT_OPTIMAL -> PRESENT_SRC_KHR ---
+    VkImageMemoryBarrier2 barrier_to_present{ .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2 };
+    barrier_to_present.srcStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    barrier_to_present.srcAccessMask       = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+    barrier_to_present.dstStageMask        = VK_PIPELINE_STAGE_2_NONE;
+    barrier_to_present.dstAccessMask       = 0;
+    barrier_to_present.oldLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    barrier_to_present.newLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    barrier_to_present.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier_to_present.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier_to_present.image               = image;
+    barrier_to_present.subresourceRange    = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+
+    VkDependencyInfo dep_info_to_present{ .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+    dep_info_to_present.imageMemoryBarrierCount = 1;
+    dep_info_to_present.pImageMemoryBarriers    = &barrier_to_present;
+    vkCmdPipelineBarrier2(cmd, &dep_info_to_present);
+
+    vkEndCommandBuffer(cmd);
+
+    // 4. Submit the command buffer
+    VkSubmitInfo2             submit_info{ .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2 };
+    VkCommandBufferSubmitInfo cmd_info{ .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO };
+    cmd_info.commandBuffer             = cmd;
+    submit_info.commandBufferInfoCount = 1;
+    submit_info.pCommandBufferInfos    = &cmd_info;
+
+    VkFenceCreateInfo submit_fence_info{ .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+    VkFence           submit_fence;
+    vkCreateFence(device, &submit_fence_info, nullptr, &submit_fence);
+
+    vkQueueSubmit2(gcontext.graphics_queue, 1, &submit_info, submit_fence);
+    vkWaitForFences(device, 1, &submit_fence, VK_TRUE, UINT64_MAX);
+
+    vkDestroyFence(device, submit_fence, nullptr);
+    vkDestroyCommandPool(device, temp_pool, nullptr);
+
+    // 5. Present the image
+    VkPresentInfoKHR present_info{ .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
+    present_info.swapchainCount = 1;
+    present_info.pSwapchains    = &swapchain_handle;
+    present_info.pImageIndices  = &image_index;
+
+    VkResult present_result     = vkQueuePresentKHR(gcontext.present_queue, &present_info);
+    if (present_result == VK_ERROR_OUT_OF_DATE_KHR || present_result == VK_SUBOPTIMAL_KHR) {
+        swapchain_resize_requested = true;
+    }
+
+    end_frame();
 }
+
+bool
+Application::begin_frame() {
+    if (is_minimized) return false;
+    if (swapchain_resize_requested) {
+        handle_resize();
+        if (is_minimized) return false; // just in case minimization happened during resize.
+    }
+
+    if (gcontext.swapchain.get_handle() == VK_NULL_HANDLE) return false;
+    // if (swapchain_resize_requested && !is_minimized) {
+    //     i32 width, height;
+    //     SDL_GetWindowSizeInPixels(window, &width, &height);
+    //     if (width > 0 && height > 0) {
+    //         FDEBUG("TODO: recreate or request renderer to recreate a swapchain. ({}, {})", width, height);
+    //         // swapchain_resize_requested = false;
+    //         handle_resize();
+    //     }
+    // }
+    return true;
+}
+
+void
+Application::end_frame() {}
 
 void
 Application::shutdown() {
@@ -399,16 +596,12 @@ Application::shutdown() {
     components::shutdown_script_component_system();
 
     // Clean up in reverse creation order
-    gcontext.swapchain.destroy(gcontext);
-    if (gcontext.surface != VK_NULL_HANDLE) {
-        vkDestroySurfaceKHR(gcontext.vkb_instance.instance, gcontext.surface, nullptr);
-        gcontext.surface = VK_NULL_HANDLE;
-    }
+
     gcontext.destroy();
 
     FInputManager.unregister_window(window); // SDL_GetWindowFromID(window_id)
     SDL_DestroyWindow(window);
-    SDL_Vulkan_UnloadLibrary();
+    // SDL_Vulkan_UnloadLibrary();
     SDL_Quit();
 
     FINFO("Closed SDL window.");

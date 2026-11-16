@@ -57,7 +57,9 @@ GraphicsContext::init_instance(const char *app_name, uint32_t ext_count, const c
     }
 
     // retrieve created by vkb VkInstance.
-    vkb_instance = instance_ret.value();
+    vkb_instance    = instance_ret.value();
+    instance        = vkb_instance.instance;
+    debug_messenger = vkb_instance.debug_messenger;
     FINFO("vulkan instance created successfully.");
     return true;
 }
@@ -91,7 +93,9 @@ GraphicsContext::init_device(VkSurfaceKHR surface) {
 
     if (!device_ret) return false;
 
-    vkb_device = device_ret.value();
+    vkb_device      = device_ret.value();
+    device          = vkb_device.device;
+    physical_device = vkb_device.physical_device;
 
     FINFO("vulkan device created successfully.");
     FINFO("[VULKAN] Present queue index: {}", vkb_device.get_queue_index(vkb::QueueType::present).value());
@@ -99,9 +103,42 @@ GraphicsContext::init_device(VkSurfaceKHR surface) {
     FINFO("[VULKAN] Compute queue index: {}", vkb_device.get_queue_index(vkb::QueueType::compute).value());
     FINFO("[VULKAN] Transfer queue index: {}", vkb_device.get_queue_index(vkb::QueueType::transfer).value());
 
-    graphics_queue = vkb_device.get_queue(vkb::QueueType::graphics).value();
-    present_queue  = vkb_device.get_queue(vkb::QueueType::present).value();
+    present_family_index  = vkb_device.get_queue_index(vkb::QueueType::present).value();
+    graphics_family_index = vkb_device.get_queue_index(vkb::QueueType::graphics).value();
+    compute_family_index  = vkb_device.get_queue_index(vkb::QueueType::compute).value();
+    transfer_family_index = vkb_device.get_queue_index(vkb::QueueType::transfer).value();
+
+    graphics_queue        = vkb_device.get_queue(vkb::QueueType::graphics).value();
+    present_queue         = vkb_device.get_queue(vkb::QueueType::present).value();
+    compute_queue         = vkb_device.get_queue(vkb::QueueType::compute).value();
+
+    //
+    auto transfer_res = vkb_device.get_queue(vkb::QueueType::transfer);
+    if (transfer_res) {
+        transfer_queue        = transfer_res.value();
+        transfer_family_index = vkb_device.get_queue_index(vkb::QueueType::transfer).value();
+    } else {
+        transfer_queue        = graphics_queue;
+        transfer_family_index = graphics_family_index;
+    }
     return true;
+}
+
+bool
+GraphicsContext::create_swapchain(u32 width, u32 height) {
+    swapchain.create(*this, width, height);
+
+    if (swapchain.get_handle() == VK_NULL_HANDLE) return false;
+    return true;
+}
+
+void
+GraphicsContext::destroy_swapchain() {
+    if(swapchain.get_handle() != VK_NULL_HANDLE) swapchain.destroy(*this);
+}
+
+void GraphicsContext::recreate_swapchain(u32 width, u32 height) {
+    swapchain.recreate(*this, width, height);
 }
 
 bool
@@ -128,7 +165,19 @@ void
 GraphicsContext::destroy() {
     vkDeviceWaitIdle(vkb_device.device);
 
+    swapchain.destroy(*this);
+    if (surface != VK_NULL_HANDLE) {
+        vkDestroySurfaceKHR(instance, surface, nullptr);
+    }
+
     vkb::destroy_device(vkb_device);
+    device          = VK_NULL_HANDLE;
+    physical_device = VK_NULL_HANDLE;
+    // vkb::destroy_debug_utils_messenger(instance, debug_messenger);
+    surface         = VK_NULL_HANDLE;
+    debug_messenger = VK_NULL_HANDLE;
+    graphics_queue  = VK_NULL_HANDLE;
+    present_queue   = VK_NULL_HANDLE;
     vkb::destroy_instance(vkb_instance);
     FINFO("graphics::GraphicsContext destroyed gracefully.");
 }

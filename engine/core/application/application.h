@@ -37,6 +37,23 @@ struct KeyBinding {
         : action(act), required_down(std::move(mods)), pressed_this_frame(key), on_triggered(std::move(cb)) {}
 };
 
+struct GameKeyBinding {
+    std::string                             name;
+    std::vector<input::KeyboardKeys::Value> required_down;
+    input::KeyboardKeys::Value              pressed_this_frame;
+    std::function<void()>                   on_triggered;
+};
+
+struct GameMouseButtonBinding {
+    std::string                             name;
+    std::vector<input::KeyboardKeys::Value> required_down; // e.g., Hold LSHIFT + Click
+    input::MouseButton::Value               button;        // Left, Right, Middle, etc.
+    std::function<void()>                   on_triggered;
+};
+
+GameKeyBinding         &get_game_key_binding(const std::string &name);
+GameMouseButtonBinding &get_game_mouse_button_binding(const std::string &name);
+
 class Application {
   public:
     DISABLE_COPY_AND_MOVE(Application);
@@ -67,6 +84,9 @@ class Application {
 
     virtual void handle_input();
     virtual void register_default_input_bindings();
+
+    virtual bool begin_frame();
+    virtual void end_frame();
 
   protected:
     void on_quit_triggered();
