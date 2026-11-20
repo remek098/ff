@@ -12,6 +12,8 @@
 #include "core/input/input_system.h"
 
 #include "core/application/application.h"
+#include "core/application/imgui/imgui_layer.h"
+#include "core/application/imgui/editor_elements/menu_bar.h"
 
 #include "imgui_impl_vulkan.h"
 #include "imgui_impl_sdl3.h"

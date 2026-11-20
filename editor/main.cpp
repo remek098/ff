@@ -29,6 +29,13 @@ class Editor : public ff::Application {
                                          FInputManager.get_mouse_y(get_window_id()));
                                });
 
+        get_registered_editor_elements().push_back(FImGuiLayer.register_element(
+            ff::make_uptr<MainMenuBarElement>([this]() { request_reopen(); }, [this]() { request_exit(); })));
+        FImGuiLayer.register_element(ff::make_uptr<ff::editor::LambdaEditorElement>([]() {
+            ImGui::Begin("Scene Outliner");
+            ImGui::Text("World / Entities");
+            ImGui::End();
+        }));
         return true;
     }
 

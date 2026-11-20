@@ -77,3 +77,4 @@
 #endif // !FASSERT_MSG
 
 #include "id.h"
+#include "memory_defines.h"

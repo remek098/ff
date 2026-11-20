@@ -3,12 +3,14 @@
 #include "SDL3/SDL.h"
 #include "SDL3/SDL_vulkan.h"
 
-#include "core/logging/logger.h"
+// #include "core/logging/logger.h"
 #include "utils/ftimer.h"
 #include "core/input/input_system.h"
-#include "components/components_common.h"
+// #include "components/components_common.h"
 #include "graphics/graphics_context.h"
-#include "graphics/swapchain.h"
+#include "imgui/imgui_layer.h"
+// #include "application/imgui/editor_elements/menu_bar.h"
+// #include "graphics/swapchain.h"
 #include <string_view>
 #include <vector>
 #include <thread>
@@ -76,6 +78,9 @@ class Application {
                                         input::MouseButton::Value               button,
                                         std::function<void()>                   callback);
 
+    void         request_reopen() { reopen_requested = true; }
+    void         request_exit() { is_running = false; }
+
   protected:
     virtual bool init(const char *name, u32 width, u32 height);
     virtual void update(f32 dt);
@@ -131,4 +136,6 @@ class Application {
 
     bool             reopen_requested{ false };
 };
+
+std::vector<editor::ElementId> &get_registered_editor_elements();
 } // namespace ff
