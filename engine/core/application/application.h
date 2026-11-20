@@ -128,5 +128,7 @@ class Application {
     std::atomic<f32> game_fps{ 0.0f };
     std::atomic<f32> render_dt{ 0.0f };
     std::atomic<f32> render_fps{ 0.0f };
+
+    bool             reopen_requested{ false };
 };
 } // namespace ff

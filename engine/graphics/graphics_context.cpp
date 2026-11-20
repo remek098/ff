@@ -116,7 +116,7 @@ GraphicsContext::init_device(VkSurfaceKHR surface) {
 
     vkb::PhysicalDeviceSelector selector{ vkb_instance };
     auto                        phys_device_ret = selector.set_surface(surface)
-                                                      .set_minimum_version(1, 3)
+                                                      .set_minimum_version(1, 4)
                                                       .set_required_features_13(features)
                                                       .set_required_features_12(features12)
                                                       .add_required_extensions({

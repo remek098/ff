@@ -4,18 +4,22 @@
 #include <algorithm>
 
 // #if BUILD_WITH_EDITOR
-// #include "imgui.h"
-// #include "imgui_impl_sdl3.h"
-// #include "imgui_impl_vulkan.h"
+#include "imgui.h"
+#include "imgui_impl_sdl3.h"
+#include "imgui_impl_vulkan.h"
 // #endif
 
 namespace ff {
-VkDescriptorPool imgui_pool;
 
 namespace {
 void
-set_sdl_window_title_frame_metrics(SDL_Window *window, const std::string &name, f32 game_fps, f32 render_dt, f32 render_fps) {
-    const std::string title = std::format("{} | Render: {:.2f} ms ({:.1f} FPS) | Game: {:.0f} Hz", name, render_dt * 1000.f, render_fps, game_fps);
+set_sdl_window_title_frame_metrics(SDL_Window        *window,
+                                   const std::string &name,
+                                   f32                game_fps,
+                                   f32                render_dt,
+                                   f32                render_fps) {
+    const std::string title = std::format(
+        "{} | Render: {:.2f} ms ({:.1f} FPS) | Game: {:.0f} Hz", name, render_dt * 1000.f, render_fps, game_fps);
 
     SDL_SetWindowTitle(window, title.c_str());
 }
@@ -26,9 +30,20 @@ Application::Application(const char *name, u32 width, u32 height)
 }
 
 namespace {
+struct EditorFramePayload {
+    ImDrawData *draw_data = nullptr; // Valid until main thread calls NewFrame() again
+    bool        ready     = false;
+};
+
 std::mutex                          bindings_mutex;
 std::vector<GameKeyBinding>         game_key_bindings;
 std::vector<GameMouseButtonBinding> game_mouse_button_bindings;
+
+std::mutex                          imgui_frame_mutex;
+std::condition_variable             imgui_frame_cv;
+EditorFramePayload                  imgui_payload;
+VkDescriptorPool                    imgui_pool;
+bool                                imgui_shutting_down = false;
 } // namespace
 
 GameKeyBinding &
@@ -130,12 +145,6 @@ Application::init(const char *name, u32 width, u32 height) {
     // SDL_RaiseWindow(window);
 
     FINFO("initialized SDL window successfully.");
-    is_running      = true;
-    is_game_running = true;
-    game_thread     = std::jthread([this]() { game_thread_proc(); });
-    render_thread = std::jthread([this]() { render_thread_proc(); });
-    FINFO("Game thread started.");
-    FINFO("Application initialized successfully.");
 
     register_default_input_bindings();
 
@@ -180,6 +189,67 @@ Application::init(const char *name, u32 width, u32 height) {
 
     // ImGui_ImplVulkan_Init(&init_info);
 
+    {
+        std::lock_guard<std::mutex> lock(imgui_frame_mutex);
+        imgui_payload.draw_data = nullptr;
+        imgui_payload.ready     = false;
+        imgui_shutting_down     = false;
+    }
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+
+    ImGuiIO &io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    // Keep ViewportsEnable off for now while using Option A with render_thread.
+
+    ImGui_ImplSDL3_InitForVulkan(window);
+
+    // VkDescriptorPoolSize       pool_sizes[] = { { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 } };
+    VkDescriptorPoolSize pool_sizes[] = {
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+        { VK_DESCRIPTOR_TYPE_SAMPLER, 100 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 100 },
+    };
+
+    VkDescriptorPoolCreateInfo pool_info{};
+    pool_info.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.flags         = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    pool_info.maxSets       = 1000;
+    pool_info.poolSizeCount = static_cast<uint32_t>(std::size(pool_sizes));
+    pool_info.pPoolSizes    = pool_sizes;
+
+    vkCreateDescriptorPool(gcontext.vkb_device.device, &pool_info, nullptr, &imgui_pool);
+
+    ImGui_ImplVulkan_InitInfo init_info{};
+    init_info.ApiVersion          = VK_API_VERSION_1_4; // Match your Vulkan instance/device version
+    init_info.Instance            = gcontext.vkb_instance.instance;
+    init_info.PhysicalDevice      = gcontext.vkb_device.physical_device;
+    init_info.Device              = gcontext.vkb_device.device;
+    init_info.QueueFamily         = gcontext.graphics_family_index;
+    init_info.Queue               = gcontext.graphics_queue;
+    init_info.DescriptorPool      = imgui_pool;
+    init_info.MinImageCount       = 2;
+    init_info.ImageCount          = static_cast<uint32_t>(gcontext.swapchain.get_images().size());
+    init_info.UseDynamicRendering = true;
+
+    VkFormat color_format         = gcontext.swapchain.get_format(); // Match your swapchain image format
+    init_info.PipelineInfoMain.PipelineRenderingCreateInfo = {
+        .sType                   = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+        .colorAttachmentCount    = 1,
+        .pColorAttachmentFormats = &color_format,
+    };
+
+    ImGui_ImplVulkan_Init(&init_info);
+
+    is_running      = true;
+    is_game_running = true;
+    game_thread     = std::jthread([this]() { game_thread_proc(); });
+    render_thread   = std::jthread([this]() { render_thread_proc(); });
+    FINFO("Game thread started.");
+    FINFO("Application initialized successfully.");
+
     return true;
 }
 
@@ -200,8 +270,9 @@ Application::register_default_input_bindings() {
                    []() { FINFO("Ctrl+Shift+S pressed."); }));
 
     key_bindings.push_back(KeyBinding(Action::Reopen, {}, input::KeyboardKeys::Value::F11, [this]() {
-        shutdown();
-        init(application_name.c_str(), window_width, window_height);
+        reopen_requested = true;
+        // shutdown();
+        // init(application_name.c_str(), window_width, window_height);
         FINFO("Relaunching application...");
     }));
 }
@@ -389,10 +460,62 @@ Application::update(f32 dt) {
 
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
-        // ImGui_ImplSDL3_ProcessEvent(&event);
+        ImGui_ImplSDL3_ProcessEvent(&event);
         process_sdl_events(event);
     }
     handle_input();
+
+    // Wait if previous ImGui frame hasn't been consumed by render_thread yet
+    ImGui_ImplSDL3_NewFrame();
+    ImGui::NewFrame();
+
+    // Top bar + full-screen DockSpace (UE5-style editor shell)
+    if (ImGui::BeginMainMenuBar()) {
+        if (ImGui::BeginMenu("File")) {
+            if (ImGui::MenuItem("Reopen", "F11")) {
+                reopen_requested = true;
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Exit", "Esc")) {
+                is_running = false;
+            }
+            ImGui::EndMenu();
+        }
+        ImGui::EndMainMenuBar();
+    }
+
+    ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
+
+    ImGui::Begin("Viewport");
+    // Later: place an ImGui::Image(...) here using a VkDescriptorSet from ImGui_ImplVulkan_AddTexture(...)
+    ImGui::Text("3D Scene Viewport");
+    ImGui::End();
+
+    ImGui::Begin("Details");
+    ImGui::Text("Selected Actor / Properties");
+    ImGui::End();
+
+    ImGui::Render();
+
+    if (reopen_requested) {
+        reopen_requested = false;
+        FINFO("Relaunching application...");
+        shutdown();
+        init(application_name.c_str(), window_width, window_height);
+    }
+
+    // Publish ImGui::GetDrawData() to render_thread (guarded by mutex/cv)
+    {
+        std::unique_lock<std::mutex> lock(imgui_frame_mutex);
+        // Wait until render_thread has finished using the prior frame's ImDrawData
+        imgui_frame_cv.wait(lock, [] { return !imgui_payload.ready || imgui_shutting_down; });
+        if (imgui_shutting_down) {
+            return;
+        }
+        imgui_payload.draw_data = ImGui::GetDrawData();
+        imgui_payload.ready     = (imgui_payload.draw_data != nullptr);
+    }
+    imgui_frame_cv.notify_one(); // make sure render thread can now read that data.
 
     // components::update_script_component(dt);
 }
@@ -400,33 +523,6 @@ Application::update(f32 dt) {
 void
 Application::render() {
     if (!begin_frame()) return;
-
-#pragma region
-// // 1. Start the frame
-// ImGui_ImplVulkan_NewFrame();
-// ImGui_ImplSDL3_NewFrame();
-// ImGui::NewFrame();
-
-// // 2. Build your DockSpace UI layout
-// ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
-// ImGui::ShowDemoWindow(); // Example window
-
-// // 3. Render ImGui internal command structures
-// ImGui::Render();
-// ImDrawData *draw_data = ImGui::GetDrawData();
-
-// // 4. Record into your Vulkan command buffer (inside your render pass / dynamic rendering block)
-// // vkCmdBeginRenderPass(...) or vkCmdBeginRendering(...)
-// // ImGui_ImplVulkan_RenderDrawData(draw_data, command_buffer);
-// // vkCmdEndRenderPass(...) or vkCmdEndRendering(...)
-
-// // 5. Handle multi-viewports if enabled (renders floating editor windows)
-// ImGuiIO& io = ImGui::GetIO();
-// if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-//     ImGui::UpdatePlatformWindows();
-//     ImGui::RenderPlatformWindowsDefault();
-// }
-#pragma endregion
 
     VkDevice       device           = gcontext.device;
     VkSwapchainKHR swapchain_handle = gcontext.swapchain.get_handle();
@@ -521,7 +617,20 @@ Application::render() {
     rendering_info.colorAttachmentCount = 1;
     rendering_info.pColorAttachments    = &color_attachment;
 
+    // remember to keep vkCmdBeginRendering and vkCmdEndRendering when working around imgui.
+    ImDrawData *frame_draw_data = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(imgui_frame_mutex);
+        if (imgui_payload.ready) {
+            frame_draw_data = imgui_payload.draw_data;
+        }
+    }
+
     vkCmdBeginRendering(cmd, &rendering_info);
+    if (frame_draw_data != nullptr && frame_draw_data->CmdListsCount > 0) {
+        ImGui_ImplVulkan_RenderDrawData(frame_draw_data, cmd);
+    }
+
     vkCmdEndRendering(cmd);
 
     // --- BARRIER 2: COLOR_ATTACHMENT_OPTIMAL -> PRESENT_SRC_KHR ---
@@ -557,6 +666,14 @@ Application::render() {
 
     vkQueueSubmit2(gcontext.graphics_queue, 1, &submit_info, submit_fence);
     vkWaitForFences(device, 1, &submit_fence, VK_TRUE, UINT64_MAX);
+
+    // notify that imgui has been submitted to rendering.
+    {
+        std::lock_guard<std::mutex> lock(imgui_frame_mutex);
+        imgui_payload.draw_data = nullptr;
+        imgui_payload.ready     = false;
+    }
+    imgui_frame_cv.notify_all();
 
     vkDestroyFence(device, submit_fence, nullptr);
     vkDestroyCommandPool(device, temp_pool, nullptr);
@@ -603,16 +720,24 @@ Application::end_frame() {}
 void
 Application::shutdown() {
     is_game_running.store(false);
-    if(render_thread.joinable()) render_thread.join();
+
+    // make sure to notify render thread that imgui is no longer required to render.
+    {
+        std::lock_guard<std::mutex> lock(imgui_frame_mutex);
+        imgui_shutting_down = true;
+    }
+    imgui_frame_cv.notify_all();
+
+    if (render_thread.joinable()) render_thread.join();
     if (game_thread.joinable()) {
         game_thread.join();
     }
 
     vkDeviceWaitIdle(gcontext.vkb_device.device);
-    // ImGui_ImplVulkan_Shutdown();
-    // ImGui_ImplSDL3_Shutdown();
-    // ImGui::DestroyContext();
-    // vkDestroyDescriptorPool(gcontext.vkb_device.device, imgui_pool, nullptr);
+    ImGui_ImplVulkan_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
+    ImGui::DestroyContext();
+    vkDestroyDescriptorPool(gcontext.vkb_device.device, imgui_pool, nullptr);
 
     components::shutdown_script_component_system();
 
@@ -645,7 +770,8 @@ Application::run() {
         // if (timer.end()) set_sdl_window_title_frame_metrics(window, application_name, timer.dt_avg(),
         // timer.fps_avg());
         if (timer.end()) {
-            set_sdl_window_title_frame_metrics(window, application_name, game_fps.load(), render_dt.load(), render_fps.load());
+            set_sdl_window_title_frame_metrics(
+                window, application_name, game_fps.load(), render_dt.load(), render_fps.load());
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
