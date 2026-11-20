@@ -93,6 +93,8 @@ class Application {
 
   private:
     void       game_thread_proc();
+    void       render_thread_proc();
+
     void       handle_resize();
     VkExtent2D get_window_extent() const;
 
@@ -119,9 +121,12 @@ class Application {
     utils::FTimer     timer{};
 
     std::jthread      game_thread;
+    std::jthread      render_thread;
     std::atomic<bool> is_game_running{ false };
     // Thread-safe metrics from the game thread to show in the window title
     std::atomic<f32> game_dt{ 0.0f };
     std::atomic<f32> game_fps{ 0.0f };
+    std::atomic<f32> render_dt{ 0.0f };
+    std::atomic<f32> render_fps{ 0.0f };
 };
 } // namespace ff

@@ -4,6 +4,8 @@
 
 #include "SDL3/SDL.h"
 #include "SDL3/SDL_vulkan.h"
+#include <vulkan/vulkan.h>
+#include <vulkan/vulkan_core.h>
 
 #ifdef __APPLE__
 #include "vulkan/vulkan_metal.h"
@@ -43,7 +45,7 @@ bool
 GraphicsContext::init_instance(const char *app_name, uint32_t ext_count, const char *const *extensions) {
     vkb::InstanceBuilder instance_builder(vkGetInstanceProcAddr);
     auto                 instance_ret = instance_builder.set_app_name(app_name)
-                                            .require_api_version(1, 3, 0)
+                                            .require_api_version(1, 4, 0)
                                             .enable_extensions(ext_count, extensions)
 #if !defined(NDEBUG)
                             .request_validation_layers()
@@ -76,11 +78,63 @@ GraphicsContext::init_device(VkSurfaceKHR surface) {
     features12.bufferDeviceAddress = true;
     features12.descriptorIndexing  = true;
 
+    // Descriptor heaps
+    VkPhysicalDeviceDescriptorHeapFeaturesEXT descriptor_heap_features{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_HEAP_FEATURES_EXT
+    };
+    descriptor_heap_features.descriptorHeap = VK_TRUE;
+
+    // Mesh shading (task + mesh shaders)
+    VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT
+    };
+    mesh_shader_features.taskShader = VK_TRUE;
+    mesh_shader_features.meshShader = VK_TRUE;
+
+    // Acceleration structures + Ray tracing pipeline
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR accel_features{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR
+    };
+    accel_features.accelerationStructure = VK_TRUE;
+
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rt_pipeline_features{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR
+    };
+    rt_pipeline_features.rayTracingPipeline = VK_TRUE;
+
+    // Opacity micromaps
+    VkPhysicalDeviceOpacityMicromapFeaturesEXT micromap_features{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_OPACITY_MICROMAP_FEATURES_EXT
+    };
+    micromap_features.micromap = VK_TRUE;
+
+    // Cluster acceleration structures
+    VkPhysicalDeviceClusterAccelerationStructureFeaturesNV cluster_as_features{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CLUSTER_ACCELERATION_STRUCTURE_FEATURES_NV
+    };
+    cluster_as_features.clusterAccelerationStructure = VK_TRUE;
+
     vkb::PhysicalDeviceSelector selector{ vkb_instance };
     auto                        phys_device_ret = selector.set_surface(surface)
                                                       .set_minimum_version(1, 3)
                                                       .set_required_features_13(features)
                                                       .set_required_features_12(features12)
+                                                      .add_required_extensions({
+                                                          VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME,
+                                                          VK_EXT_MESH_SHADER_EXTENSION_NAME,
+                                                          VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+                                                          VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+                                                          VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
+                                                          VK_EXT_OPACITY_MICROMAP_EXTENSION_NAME,
+                                                          VK_NV_CLUSTER_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+                                                      })
+                                                      // Required extension feature structs
+                                                      .add_required_extension_features(descriptor_heap_features)
+                                                      .add_required_extension_features(mesh_shader_features)
+                                                      .add_required_extension_features(accel_features)
+                                                      .add_required_extension_features(rt_pipeline_features)
+                                                      .add_required_extension_features(micromap_features)
+                                                      .add_required_extension_features(cluster_as_features)
                                                       .select();
 
     if (!phys_device_ret) {
@@ -134,10 +188,11 @@ GraphicsContext::create_swapchain(u32 width, u32 height) {
 
 void
 GraphicsContext::destroy_swapchain() {
-    if(swapchain.get_handle() != VK_NULL_HANDLE) swapchain.destroy(*this);
+    if (swapchain.get_handle() != VK_NULL_HANDLE) swapchain.destroy(*this);
 }
 
-void GraphicsContext::recreate_swapchain(u32 width, u32 height) {
+void
+GraphicsContext::recreate_swapchain(u32 width, u32 height) {
     swapchain.recreate(*this, width, height);
 }
 

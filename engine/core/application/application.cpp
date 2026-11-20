@@ -14,8 +14,8 @@ VkDescriptorPool imgui_pool;
 
 namespace {
 void
-set_sdl_window_title_frame_metrics(SDL_Window *window, const std::string &name, f32 dt, f32 fps) {
-    const std::string title = std::format("{} | {:.2f} ms | {:.1f} FPS", name, dt * 1000.f, fps);
+set_sdl_window_title_frame_metrics(SDL_Window *window, const std::string &name, f32 game_fps, f32 render_dt, f32 render_fps) {
+    const std::string title = std::format("{} | Render: {:.2f} ms ({:.1f} FPS) | Game: {:.0f} Hz", name, render_dt * 1000.f, render_fps, game_fps);
 
     SDL_SetWindowTitle(window, title.c_str());
 }
@@ -133,6 +133,7 @@ Application::init(const char *name, u32 width, u32 height) {
     is_running      = true;
     is_game_running = true;
     game_thread     = std::jthread([this]() { game_thread_proc(); });
+    render_thread = std::jthread([this]() { render_thread_proc(); });
     FINFO("Game thread started.");
     FINFO("Application initialized successfully.");
 
@@ -305,6 +306,23 @@ Application::game_thread_proc() {
 }
 
 void
+Application::render_thread_proc() {
+    utils::FTimer render_timer;
+    while (is_game_running.load(std::memory_order_relaxed)) {
+        render_timer.begin();
+        f32 dt = std::min(render_timer.dt(), 0.1f);
+
+        render();
+        // Target tick rate (e.g., ~100Hz / 10ms)
+        // std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        if (render_timer.end()) {
+            render_dt.store(render_timer.dt_avg(), std::memory_order_relaxed);
+            render_fps.store(render_timer.fps_avg(), std::memory_order_relaxed);
+        }
+    }
+}
+
+void
 Application::handle_resize() {
     FDEBUG("Hello from handle_resize()");
     VkExtent2D extent = get_window_extent();
@@ -434,6 +452,7 @@ Application::render() {
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
         swapchain_resize_requested = true;
+        FWARN("Acquired swapchain image on index {} was out of date or suboptimal.", image_index);
         end_frame();
         return;
     } else if (result != VK_SUCCESS) {
@@ -551,6 +570,7 @@ Application::render() {
     VkResult present_result     = vkQueuePresentKHR(gcontext.present_queue, &present_info);
     if (present_result == VK_ERROR_OUT_OF_DATE_KHR || present_result == VK_SUBOPTIMAL_KHR) {
         swapchain_resize_requested = true;
+        FWARN("Presenting swapchain for image index: {} failed or suboptimal. Requesting resize...", image_index);
     }
 
     end_frame();
@@ -583,6 +603,7 @@ Application::end_frame() {}
 void
 Application::shutdown() {
     is_game_running.store(false);
+    if(render_thread.joinable()) render_thread.join();
     if (game_thread.joinable()) {
         game_thread.join();
     }
@@ -619,12 +640,12 @@ Application::run() {
         timer.begin();
         // std::this_thread::sleep_for(std::chrono::milliseconds(10));
         update(timer.dt());
-        render();
+        // render();
 
         // if (timer.end()) set_sdl_window_title_frame_metrics(window, application_name, timer.dt_avg(),
         // timer.fps_avg());
         if (timer.end()) {
-            set_sdl_window_title_frame_metrics(window, application_name, game_dt.load(), game_fps.load());
+            set_sdl_window_title_frame_metrics(window, application_name, game_fps.load(), render_dt.load(), render_fps.load());
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
