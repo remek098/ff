@@ -71,6 +71,9 @@ class ImGuiLayer {
     void cleanup_payload();
     void stop_rendering();
 
+    using DockspaceInitFn = std::function<void(ImGuiID dockspace_id, ImVec2 viewport_size)>;
+    void set_dockspace_init_callback(DockspaceInitFn fn);
+
   private:
     ImGuiLayer()  = default;
     ~ImGuiLayer() = default;
@@ -88,6 +91,9 @@ class ImGuiLayer {
 
     ElementId                      next_element_id{ 1 }; // Start at 1 so 0 can mean "invalid / not registered"
     bool                           shutting_down_{ false };
+
+    DockspaceInitFn                dockspace_init_fn_;
+    bool                           dockspace_initialized_{ false };
 };
 } // namespace ff::editor
 

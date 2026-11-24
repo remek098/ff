@@ -47,12 +47,25 @@ ImGuiLayer::clear_elements() {
 }
 
 void
+ImGuiLayer::set_dockspace_init_callback(DockspaceInitFn fn) {
+    dockspace_init_fn_     = std::move(fn);
+    dockspace_initialized_ = false;
+}
+
+void
 ImGuiLayer::update() {
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
 
-    // Full-screen DockSpace (UE5-style editor shell)
-    ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
+    ImGuiViewport *viewport     = ImGui::GetMainViewport();
+    ImGuiID        dockspace_id = ImGui::GetID("MainDockSpace");
+
+    if (!dockspace_initialized_ && dockspace_init_fn_) {
+        dockspace_init_fn_(dockspace_id, viewport ? viewport->Size : ImVec2{});
+        dockspace_initialized_ = true;
+    }
+
+    ImGui::DockSpaceOverViewport(dockspace_id, viewport, ImGuiDockNodeFlags_PassthruCentralNode);
 
     std::vector<ImGuiEditorElement *> active_elements;
     {

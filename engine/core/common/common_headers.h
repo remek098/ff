@@ -33,8 +33,8 @@
     DISABLE_MOVE(T)
 #endif // !DISABLE_COPY_AND_MOVE
 
-#define DEFAULT_WINDOW_WIDTH  1280
-#define DEFAULT_WINDOW_HEIGHT 720
+#define DEFAULT_WINDOW_WIDTH  1600
+#define DEFAULT_WINDOW_HEIGHT 900
 
 #include "core/logging/logger.h"
 #include "primitive_types.h"
