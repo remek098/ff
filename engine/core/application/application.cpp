@@ -11,6 +11,7 @@
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_vulkan.h"
 // #endif
+#include "graphics/helpers/vk_initializers.h"
 
 namespace ff {
 
@@ -41,7 +42,8 @@ std::vector<GameMouseButtonBinding> game_mouse_button_bindings;
 std::vector<editor::ElementId>      registered_editor_elements;
 } // namespace
 
-std::vector<editor::ElementId>& get_registered_editor_elements() {
+std::vector<editor::ElementId> &
+get_registered_editor_elements() {
     return registered_editor_elements;
 }
 
@@ -114,7 +116,6 @@ Application::init(const char *name, u32 width, u32 height) {
         return false;
     }
 
-
     Uint32             extensionCount = 0;
     const char *const *extensions     = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
     if (!extensions) {
@@ -147,13 +148,15 @@ Application::init(const char *name, u32 width, u32 height) {
     // registered_editor_elements.push_back(FImGuiLayer.register_element(
     //     ff::make_uptr<MainMenuBarElement>([this]() { reopen_requested = true; }, [this]() { is_running = false; })));
 
-    // registered_editor_elements.push_back(FImGuiLayer.register_element(ff::make_uptr<ff::editor::LambdaEditorElement>([]() {
+    // registered_editor_elements.push_back(FImGuiLayer.register_element(ff::make_uptr<ff::editor::LambdaEditorElement>([]()
+    // {
     //     ImGui::Begin("Viewport");
     //     ImGui::Text("3D Scene Viewport");
     //     ImGui::End();
     // })));
 
-    // registered_editor_elements.push_back(FImGuiLayer.register_element(ff::make_uptr<ff::editor::LambdaEditorElement>([]() {
+    // registered_editor_elements.push_back(FImGuiLayer.register_element(ff::make_uptr<ff::editor::LambdaEditorElement>([]()
+    // {
     //     ImGui::Begin("Details");
     //     ImGui::Text("Selected Actor / Properties");
     //     ImGui::End();
@@ -433,41 +436,31 @@ Application::render() {
     VkExtent2D  extent     = gcontext.swapchain.get_extent();
 
     // 2. Allocate a temporary command buffer to do the clear and layout transition
-    VkCommandPoolCreateInfo pool_info{};
-    pool_info.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    pool_info.flags            = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    pool_info.queueFamilyIndex = gcontext.graphics_family_index;
+    VkCommandPoolCreateInfo pool_info =
+        vkinit::command_pool_create_info(gcontext.graphics_family_index, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT);
 
     VkCommandPool temp_pool;
     vkCreateCommandPool(device, &pool_info, nullptr, &temp_pool);
 
-    VkCommandBufferAllocateInfo alloc_info{};
-    alloc_info.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    alloc_info.commandPool        = temp_pool;
-    alloc_info.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    alloc_info.commandBufferCount = 1;
+    VkCommandBufferAllocateInfo alloc_info = vkinit::command_buffer_allocate_info(temp_pool, 1);
 
     VkCommandBuffer cmd;
     vkAllocateCommandBuffers(device, &alloc_info, &cmd);
 
     // 3. Record commands (Transition -> Clear via Dynamic Rendering -> Transition)
-    VkCommandBufferBeginInfo begin_info{};
-    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    VkCommandBufferBeginInfo begin_info =
+        vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     vkBeginCommandBuffer(cmd, &begin_info);
 
     // --- BARRIER 1: UNDEFINED -> COLOR_ATTACHMENT_OPTIMAL ---
-    VkImageMemoryBarrier2 barrier_to_color{ .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2 };
-    barrier_to_color.srcStageMask        = VK_PIPELINE_STAGE_2_NONE;
-    barrier_to_color.srcAccessMask       = 0;
-    barrier_to_color.dstStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-    barrier_to_color.dstAccessMask       = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-    barrier_to_color.oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED;
-    barrier_to_color.newLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    barrier_to_color.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier_to_color.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier_to_color.image               = image;
-    barrier_to_color.subresourceRange    = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+    VkImageMemoryBarrier2 barrier_to_color =
+        vkinit::image_memory_barrier2(image,
+                                      VK_IMAGE_LAYOUT_UNDEFINED,
+                                      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                                      VK_PIPELINE_STAGE_2_NONE,
+                                      0,
+                                      VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                      VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT);
 
     VkDependencyInfo dep_info_to_color{ .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
     dep_info_to_color.imageMemoryBarrierCount = 1;
@@ -495,17 +488,25 @@ Application::render() {
     vkCmdEndRendering(cmd);
 
     // --- BARRIER 2: COLOR_ATTACHMENT_OPTIMAL -> PRESENT_SRC_KHR ---
-    VkImageMemoryBarrier2 barrier_to_present{ .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2 };
-    barrier_to_present.srcStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-    barrier_to_present.srcAccessMask       = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-    barrier_to_present.dstStageMask        = VK_PIPELINE_STAGE_2_NONE;
-    barrier_to_present.dstAccessMask       = 0;
-    barrier_to_present.oldLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    barrier_to_present.newLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    barrier_to_present.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier_to_present.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier_to_present.image               = image;
-    barrier_to_present.subresourceRange    = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+    // VkImageMemoryBarrier2 barrier_to_present{ .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2 };
+    // barrier_to_present.srcStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    // barrier_to_present.srcAccessMask       = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+    // barrier_to_present.dstStageMask        = VK_PIPELINE_STAGE_2_NONE;
+    // barrier_to_present.dstAccessMask       = 0;
+    // barrier_to_present.oldLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    // barrier_to_present.newLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    // barrier_to_present.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    // barrier_to_present.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    // barrier_to_present.image               = image;
+    // barrier_to_present.subresourceRange    = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+    VkImageMemoryBarrier2 barrier_to_present =
+        vkinit::image_memory_barrier2(image,
+                                      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                                      VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                                      VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                      VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                                      VK_PIPELINE_STAGE_2_NONE,
+                                      0);
 
     VkDependencyInfo dep_info_to_present{ .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
     dep_info_to_present.imageMemoryBarrierCount = 1;
@@ -530,7 +531,7 @@ Application::render() {
 
     // notify that imgui has been submitted to rendering.
     FImGuiLayer.cleanup_payload();
-    
+
     vkDestroyFence(device, submit_fence, nullptr);
     vkDestroyCommandPool(device, temp_pool, nullptr);
 

@@ -36,6 +36,11 @@ class Editor : public ff::Application {
             ImGui::Text("World / Entities");
             ImGui::End();
         }));
+        FImGuiLayer.register_element(ff::make_uptr<ff::editor::LambdaEditorElement>([]() {
+            ImGui::Begin("Assets browser");
+            ImGui::Text("Assets");
+            ImGui::End();
+        }));
         return true;
     }
 

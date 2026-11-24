@@ -7,6 +7,17 @@ namespace vkinit {
 VkCommandPoolCreateInfo     command_pool_create_info(uint32_t queueFamilyIndex, VkCommandPoolCreateFlags flags = 0);
 VkCommandBufferAllocateInfo command_buffer_allocate_info(VkCommandPool pool, uint32_t count = 1);
 
+VkImageMemoryBarrier2
+image_memory_barrier2(VkImage                 image,
+                      VkImageLayout           old_layout,
+                      VkImageLayout           new_layout,
+                      VkPipelineStageFlags2   src_stage_mask,
+                      VkAccessFlags2          src_access_mask,
+                      VkPipelineStageFlags2   dst_stage_mask,
+                      VkAccessFlags2          dst_access_mask,
+                      VkImageSubresourceRange subresource_range      = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 },
+                      uint32_t                src_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
+                      uint32_t                dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED);
 
 VkCommandBufferBeginInfo  command_buffer_begin_info(VkCommandBufferUsageFlags flags = 0);
 VkCommandBufferSubmitInfo command_buffer_submit_info(VkCommandBuffer cmd);
@@ -34,8 +45,10 @@ VkRenderingInfo           rendering_info(VkExtent2D                 renderExtent
 VkImageSubresourceRange   image_subresource_range(VkImageAspectFlags aspectMask);
 
 VkSemaphoreSubmitInfo     semaphore_submit_info(VkPipelineStageFlags2 stageMask, VkSemaphore semaphore);
+
 VkDescriptorSetLayoutBinding
 descriptorset_layout_binding(VkDescriptorType type, VkShaderStageFlags stageFlags, uint32_t binding);
+
 VkDescriptorSetLayoutCreateInfo descriptorset_layout_create_info(VkDescriptorSetLayoutBinding *bindings,
                                                                  uint32_t                      bindingCount);
 VkWriteDescriptorSet            write_descriptor_image(VkDescriptorType       type,
@@ -51,6 +64,7 @@ VkDescriptorBufferInfo          buffer_info(VkBuffer buffer, VkDeviceSize offset
 VkImageCreateInfo               image_create_info(VkFormat format, VkImageUsageFlags usageFlags, VkExtent3D extent);
 VkImageViewCreateInfo           imageview_create_info(VkFormat format, VkImage image, VkImageAspectFlags aspectFlags);
 VkPipelineLayoutCreateInfo      pipeline_layout_create_info();
+
 VkPipelineShaderStageCreateInfo
 pipeline_shader_stage_create_info(VkShaderStageFlagBits stage, VkShaderModule shaderModule, const char *entry = "main");
 } // namespace vkinit
