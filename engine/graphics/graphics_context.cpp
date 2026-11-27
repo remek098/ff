@@ -75,8 +75,19 @@ GraphicsContext::init_device(VkSurfaceKHR surface) {
 
     // vulkan 1.2 features
     VkPhysicalDeviceVulkan12Features features12{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
-    features12.bufferDeviceAddress = true;
-    features12.descriptorIndexing  = true;
+    features12.bufferDeviceAddress                          = true;
+    features12.descriptorIndexing                           = true;
+    features12.runtimeDescriptorArray                       = VK_TRUE;
+    features12.descriptorBindingPartiallyBound              = VK_TRUE;
+    features12.descriptorBindingVariableDescriptorCount     = VK_TRUE;
+    features12.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+    features12.shaderSampledImageArrayNonUniformIndexing    = VK_TRUE;
+
+    // Shader objects
+    VkPhysicalDeviceShaderObjectFeaturesEXT shader_object_features{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_OBJECT_FEATURES_EXT
+    };
+    shader_object_features.shaderObject = VK_TRUE;
 
     // Descriptor heaps
     VkPhysicalDeviceDescriptorHeapFeaturesEXT descriptor_heap_features{
@@ -120,6 +131,7 @@ GraphicsContext::init_device(VkSurfaceKHR surface) {
                                                       .set_required_features_13(features)
                                                       .set_required_features_12(features12)
                                                       .add_required_extensions({
+                                                          VK_EXT_SHADER_OBJECT_EXTENSION_NAME,
                                                           VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME,
                                                           VK_EXT_MESH_SHADER_EXTENSION_NAME,
                                                           VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
@@ -129,6 +141,7 @@ GraphicsContext::init_device(VkSurfaceKHR surface) {
                                                           VK_NV_CLUSTER_ACCELERATION_STRUCTURE_EXTENSION_NAME,
                                                       })
                                                       // Required extension feature structs
+                                                      .add_required_extension_features(shader_object_features)
                                                       .add_required_extension_features(descriptor_heap_features)
                                                       .add_required_extension_features(mesh_shader_features)
                                                       .add_required_extension_features(accel_features)

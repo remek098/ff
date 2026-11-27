@@ -138,7 +138,6 @@ ProjectBrowser::register_imgui_widget(OnProjectSelected on_select) {
 
             ImGui::BeginDisabled(selected_index < 0 || selected_index >= static_cast<int>(projects.size()));
             if (ImGui::Button("Open Project")) {
-                // Open projects[selected_index].full_path
                 trigger_open(selected_index);
             }
             ImGui::EndDisabled();

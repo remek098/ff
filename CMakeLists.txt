@@ -9,9 +9,14 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # all files will land in the output directory
+# set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+# set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+# set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# executable and .dll will land in /bin/ but .lib files in /bin/lib/
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/lib)
 
 find_package(Vulkan REQUIRED)
 
@@ -35,6 +40,7 @@ set(SDL_OPENGL OFF CACHE BOOL "Disable OpenGL support" FORCE)
 set(SDL_LIBC ON CACHE BOOL "Use system C library" FORCE)
 add_subdirectory("${VENDOR_DIR}/sdl3")
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 add_subdirectory(engine)
 add_subdirectory(tests)
@@ -72,4 +78,9 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
         target_compile_options(engine PRIVATE -march=native)
         target_compile_options(test PRIVATE -march=native)
     endif()
+endif()
+
+find_program(SLANGC_EXECUTABLE slangc HINTS "$ENV{VULKAN_SDK}/bin")
+if(NOT SLANGC_EXECUTABLE)
+    message(FATAL_ERROR "slangc compiler not found! Ensure Vulkan SDK is installed and VULKAN_SDK is set.")
 endif()

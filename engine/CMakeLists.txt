@@ -6,16 +6,6 @@ file(GLOB_RECURSE ENGINE_SOURCES
 
 set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/vendor/imgui")
 
-# list(APPEND ENGINE_SOURCES
-#     "${CMAKE_SOURCE_DIR}/vendor/vkb/src/VkBootstrap.cpp"
-#     "${IMGUI_DIR}/imgui.cpp"
-#     "${IMGUI_DIR}/imgui_demo.cpp"
-#     "${IMGUI_DIR}/imgui_draw.cpp"
-#     "${IMGUI_DIR}/imgui_tables.cpp"
-#     "${IMGUI_DIR}/imgui_widgets.cpp"
-#     "${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp"
-#     "${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp"
-# )
 set(VENDOR_SOURCES
     "${CMAKE_SOURCE_DIR}/vendor/vkb/src/VkBootstrap.cpp"
     "${IMGUI_DIR}/imgui.cpp"
@@ -51,24 +41,6 @@ set(SPDLOG_BUILD_BENCH OFF CACHE BOOL "" FORCE)
 add_subdirectory("${CMAKE_SOURCE_DIR}/vendor/spdlog" "${CMAKE_BINARY_DIR}/vendor/spdlog" EXCLUDE_FROM_ALL)
 add_subdirectory("${CMAKE_SOURCE_DIR}/vendor/glm" "${CMAKE_BINARY_DIR}/vendor/glm" EXCLUDE_FROM_ALL)
 
-# add_library(engine STATIC ${ENGINE_SOURCES})
-
-# target_include_directories(engine PUBLIC 
-#     ${CMAKE_CURRENT_SOURCE_DIR}
-#     ${CMAKE_CURRENT_SOURCE_DIR}/core           
-#     ${Vulkan_INCLUDE_DIRS}                      # Vulkan SDK
-#     "${CMAKE_SOURCE_DIR}/vendor/vma/include"    # Vulkan Memory Allocator
-#     "${CMAKE_SOURCE_DIR}/vendor/sdl3/include"   # SDL3
-#     "${CMAKE_SOURCE_DIR}/vendor/vkb/src"        # VkBootstrap
-#     "${IMGUI_DIR}"                              # ImGui
-#     "${IMGUI_DIR}/backends"                     # ImGui backends
-# )
-
-# target_link_libraries(engine PUBLIC
-#     Vulkan::Vulkan
-#     SDL3::SDL3
-#     spdlog::spdlog
-# )
 
 add_library(engine STATIC ${ENGINE_SOURCES})
 
@@ -93,19 +65,11 @@ target_link_libraries(engine PUBLIC
     glm::glm
 )
 
-# target_precompile_headers(engine PRIVATE
-#     <vector>
-#     <deque>
-#     <string>
-#     <memory>
-#     <vulkan/vulkan.h>
-#     <SDL3/SDL.h>
-#     <spdlog/spdlog.h>
-#     <glm/glm.hpp>
-#     <glm/gtc/matrix_transform.hpp>
-#     <glm/gtc/quaternion.hpp>
-#     <glm/gtc/round.hpp>
-#     <glm/gtc/type_ptr.hpp>
-# )
-
+target_compile_definitions(engine PUBLIC
+    GLM_FORCE_RADIANS
+    GLM_FORCE_DEPTH_ZERO_TO_ONE # (if using Vulkan/DirectX)
+)
 target_precompile_headers(engine PRIVATE pch.h)
+
+include(Shaders)
+add_slang_shaders(engine "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
