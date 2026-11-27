@@ -1,11 +1,24 @@
 #define SDL_MAIN_HANDLED 1
 #include "EngineAPI.h"
 
+#include "assets/asset_browser.h"
+#include "project/project_browser.h"
+
 using namespace ff;
 
 void
 save_all_asset_files() {
     FDEBUG("Editor Asset Browser: Save all button pressed.");
+}
+
+inline std::string
+get_current_working_directory() {
+    std::error_code ec;
+    const fs::path  cwd = fs::current_path(ec);
+    if (ec) {
+        return "<failed to get cwd: " + ec.message() + ">";
+    }
+    return cwd.string();
 }
 
 class Editor : public ff::Application {
@@ -40,36 +53,14 @@ class Editor : public ff::Application {
             build_default_editor_layout(dockspace_id, viewport_size);
         });
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 2.0f);
-        get_registered_editor_elements().push_back(FImGuiLayer.register_element(
-            ff::make_uptr<MainMenuBarElement>([this]() { request_reopen(); }, [this]() { request_exit(); })));
-        FImGuiLayer.register_element(ff::make_uptr<ff::editor::LambdaEditorElement>([]() {
-            ImGui::Begin("Scene Outliner");
-            ImGui::Text("World / Entities");
-            ImGui::End();
-        }));
-        FImGuiLayer.register_element(ff::make_uptr<ff::editor::LambdaEditorElement>([this]() {
-            ImGui::Begin(
-                "Assets browser", nullptr, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_AlwaysVerticalScrollbar);
+        register_editor_widgets();
+        project::ProjectBrowser::register_imgui_widget([this](const std::filesystem::path &game_dir) {
+            active_game_dir_ = game_dir;
+            FINFO("Active game directory set to: {}", active_game_dir_.string());
+            // Load project config / assets from active_game_dir_ here
+        });
 
-            if (ImGui::BeginMenuBar()) {
-                if (ImGui::BeginMenu("File")) {
-                    if (ImGui::MenuItem("Save all", "Ctrl + S")) {
-                        if (on_asset_browser_save_all_) on_asset_browser_save_all_();
-                    }
-                    ImGui::EndMenu();
-                }
-                ImGui::EndMenuBar();
-            }
-
-            // 2. Toolbar strip directly under the menu bar with a "Save all" button
-            if (ImGui::SmallButton("Save all")) {
-                if (on_asset_browser_save_all_) on_asset_browser_save_all_();
-            }
-            ImGui::Separator();
-
-            ImGui::Text("Assets");
-            ImGui::End();
-        }));
+        FINFO("Current working directory: {}", get_current_working_directory());
 
         return true;
     }
@@ -102,8 +93,42 @@ class Editor : public ff::Application {
         ImGui::DockBuilderFinish(dockspace_id);
     }
 
+    void register_editor_widgets() {
+        get_registered_editor_elements().push_back(FImGuiLayer.register_element(
+            ff::make_uptr<MainMenuBarElement>([this]() { request_reopen(); }, [this]() { request_exit(); })));
+        FImGuiLayer.register_element(ff::make_uptr<ff::editor::LambdaEditorElement>([]() {
+            ImGui::Begin("Scene Outliner");
+            ImGui::Text("World / Entities");
+            ImGui::End();
+        }));
+        FImGuiLayer.register_element(ff::make_uptr<ff::editor::LambdaEditorElement>([this]() {
+            ImGui::Begin(
+                "Assets browser", nullptr, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_AlwaysVerticalScrollbar);
+
+            if (ImGui::BeginMenuBar()) {
+                if (ImGui::BeginMenu("File")) {
+                    if (ImGui::MenuItem("Save all", "Ctrl + S")) {
+                        if (on_asset_browser_save_all_) on_asset_browser_save_all_();
+                    }
+                    ImGui::EndMenu();
+                }
+                ImGui::EndMenuBar();
+            }
+
+            // 2. Toolbar strip directly under the menu bar with a "Save all" button
+            if (ImGui::SmallButton("Save all")) {
+                if (on_asset_browser_save_all_) on_asset_browser_save_all_();
+            }
+            ImGui::Separator();
+
+            ImGui::Text("Assets");
+            ImGui::End();
+        }));
+    }
+
   private:
     std::function<void()> on_asset_browser_save_all_;
+    std::filesystem::path active_game_dir_;
 };
 
 int
